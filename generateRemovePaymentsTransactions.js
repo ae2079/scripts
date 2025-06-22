@@ -55,33 +55,37 @@ function buildTransactions(toAddress, client, userAddresses) {
 }
 
 
-function generateTransactionJson(safe, projectName, paymentProcessor, client, paymentReceiver) {
-    // Current timestamp in milliseconds
+function generateTransactionJson(safe, projectName, paymentProcessor, client, userAddresses) {
+    const batchSize = 25;
+    const totalUsers = userAddresses.length;
+    const totalBatches = Math.ceil(totalUsers / batchSize);
     const currentTimestamp = Date.now();
 
-    // Create the transaction structure
-    const transactionData = {
-        version: "1.0",
-        chainId: "137", // Polygon Mainnet
-        createdAt: currentTimestamp,
-        meta: {
-            name: `[REMOVE-PAYMENTS]-[${projectName}]-[QACC-ROUND-1]-[TX-0]`,
-            description: `Batch 1 for ${projectName}`,
-            txBuilderVersion: "",
-            createdFromSafeAddress: safe,
-            createdFromOwnerAddress: "",
-            checksum: ""
-        },
-        transactions: buildTransactions(paymentProcessor, client, userAddresses)
-    };
+    for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
+        const startIndex = batchIndex * batchSize;
+        const endIndex = Math.min(startIndex + batchSize, totalUsers);
+        const batchUsers = userAddresses.slice(startIndex, endIndex);
 
-    // Generate filename with timestamp
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '').replace('T', '_').slice(0, 15);
-    const filename = `transactions_${timestamp}.json`;
+        const transactionData = {
+            version: "1.0",
+            chainId: "137", // Polygon Mainnet
+            createdAt: currentTimestamp,
+            meta: {
+                name: `[REMOVE-PAYMENTS]-[${projectName}]-[QACC-ROUND-1]-[TX-${batchIndex}]`,
+                description: `Batch ${batchIndex + 1} for ${projectName}`,
+                txBuilderVersion: "",
+                createdFromSafeAddress: safe,
+                createdFromOwnerAddress: "",
+                checksum: ""
+            },
+            transactions: buildTransactions(paymentProcessor, client, batchUsers, batchSize)
+        };
 
-    // Write to JSON file
-    fs.writeFileSync(filename, JSON.stringify(transactionData, null, 2));
-    console.log(`Transaction file generated: ${filename}`);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '').replace('T', '_').slice(0, 15);
+        const filename = `transactions_batch${batchIndex + 1}_${timestamp}.json`;
+        fs.writeFileSync(filename, JSON.stringify(transactionData, null, 2));
+        console.log(`Transaction file generated: ${filename}`);
+    }
 }
 
 

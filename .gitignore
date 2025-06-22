@@ -1,0 +1,11 @@
+# outputs
+*.json
+
+# txs
+.oldTXs/
+
+# node_modules
+node_modules
+
+# .env
+.env

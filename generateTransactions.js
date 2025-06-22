@@ -204,19 +204,32 @@ function generateTransactionJson(fundingPotMSAddress, projectName, donationToken
 
 
 // Run the function
-const projectName = 'TEST_PROJECT';
-const orchestratorAddress = "0x28c066bb3a518c41623fc1e282cb491243b6ebc5";
-const fundingPotMSAddress = "0x6a15235f02d23b81dd9de9f522c63029f812b1ec"; // project address that donations goes to it
-const donationTokenAddress = "0xc20CAf8deE81059ec0c8E5971b2AF7347eC131f4"; // TPOL contract address
-const abcTokenAddress = "0xdf553E1c79434AdbfE2b3489b1062E3e3DE73542";
-const userAddress = "0x864af8991100d5E2Df52a3c7ae64db111E983D24";
+// const projectName = 'JEFFERYS_PROJECT';
+// const orchestratorAddress = "0x64413f88f7a77abc951051e12e8d1c4be00be3d0";
+// const fundingPotMSAddress = "0x06ee820a94d7f23d3d3468a159737287059edddf"; // project address that donations goes to it
+// const donationTokenAddress = "0xc20CAf8deE81059ec0c8E5971b2AF7347eC131f4"; // TPOL contract address
+// const abcTokenAddress = "0x3c042431c55afa630e5af2c25cb7baad8d992a9e";
+// const userAddress = "0x23d4B92783975A0B240BD863193B1e162929F4C9";
+// const tokenAmount = 6; // we should have or send this amount of donation token to the porject address before execute this script
+
+const projectName = 'TAMS_PROJECT';
+// const orchestratorAddress = "0x0899b39163b813b8e5b1e43d549d9e357d598fef";
+const fundingPotMSAddress = "0x5527c2391c541f917197bb4b2b9fdd92b3ab12f2";
+const donationTokenAddress = "0x806B448d6C5b507727AD715425B744f038E475bc";
+const abcTokenAddress = "0x84c4ca1e5487ef0464a17880ee0fb235bd10a8b3";
+const userAddress = "0x2148106E53edc98e9196f4aDEAC83EA9916F99d7";
+const tokenAmount = 10;
+
 const start = Math.floor(Date.now() / 1000) + 1800; // 30 mins after now
 const cliff = 1800; // 30 mins
 const end = start + 2 * 60 * 60; // 2 hours after start
-const tokenAmount = 10; // we should have or send this amount of donation token to the porject address before execute this script
-const fundingManagerAddress = await getFundingManagerAddress(orchestratorAddress);
-const ABCTokenAmount = await calculatePurchaseReturn(fundingManagerAddress, tokenAmount);
-console.log("purchaseReturn amount:", ABCTokenAmount);
+// const fundingManagerAddress = await getFundingManagerAddress(orchestratorAddress);
+// const ABCTokenAmount = await calculatePurchaseReturn(fundingManagerAddress, tokenAmount);
+// console.log("purchaseReturn amount:", ABCTokenAmount);
+
+const orchestratorAddress = "0x097Fea9749186998A4D0835E101eF786484528b8";
 const paymentRouterAddress = await getPaymentRouterAddress(orchestratorAddress);
 
-generateTransactionJson(fundingPotMSAddress, projectName, donationTokenAddress, fundingManagerAddress, tokenAmount, ABCTokenAmount, paymentRouterAddress);
+console.log("payment router address:", paymentRouterAddress);
+
+// generateTransactionJson(fundingPotMSAddress, projectName, donationTokenAddress, fundingManagerAddress, tokenAmount, ABCTokenAmount, paymentRouterAddress);
