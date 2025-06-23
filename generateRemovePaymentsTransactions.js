@@ -90,10 +90,10 @@ function generateTransactionJson(safe, projectName, paymentProcessor, client, us
 
 
 
-const projectName = 'AKARAN';
-const paymentProcessor = "0xDE1811172756feb79a4c937246B320d36615C184";
-const paymentRouterAddress = "0x9858b8FeE34F27959e3CDFAf022a5D0844eaeA65";
-const fundingPotMSAddress = "0x473C36457e2c134837937F7C20aA0aBaf78210c3";
+const projectName = 'X23';
+const paymentProcessor = "0xD6F574062E948d6B7F07c693f1b4240aFeA41657";
+const paymentRouterAddress = "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be";
+const fundingPotMSAddress = "0xe077bC743b10833cC938cd5700F92316d5dA11Bf";
 
 // test
 const userAddress = "0x313a58f11d8cf6f1667b7c8d615bd93b8c3f49cb";
@@ -101,7 +101,37 @@ const userAddress = "0x313a58f11d8cf6f1667b7c8d615bd93b8c3f49cb";
 // generateTransactionJson(fundingPotMSAddress, projectName, paymentProcessor, paymentRouterAddress, userAddress);
 
 const filesData = readTransactionFile("4.json");
-const userAddresses = getUserAddressesFromTransactions(filesData.transactions.readable);
+const qaccUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
 
-generateTransactionJson(fundingPotMSAddress, projectName, paymentProcessor, paymentRouterAddress, userAddresses);
+const filesDataEA1 = readTransactionFile("1.json");
+const ea1Users = getUserAddressesFromTransactions(filesDataEA1.transactions.readable);
+
+const filesDataEA2 = readTransactionFile("2.json");
+const ea2Users = getUserAddressesFromTransactions(filesDataEA2.transactions.readable);
+
+const filesDataEA3 = readTransactionFile("3.json");
+const ea3Users = getUserAddressesFromTransactions(filesDataEA3.transactions.readable);
+
+const filesDataS2 = readTransactionFile("5.json");
+const S2Users = getUserAddressesFromTransactions(filesDataS2.transactions.readable);
+
+const teamsVestings = [
+    "0x0D3edA53332b9fDf4d4e9FB4C1C940A80B16eD9D",
+    "0x01b9F17e97dFb2e25581690e048d4fF8d0b788f3",
+    "0xcE3848cDf3304CB71ef1615700EEe09E030559F9",
+    "0x346e969567224490C54B8C8DB783b8D22ADFD5d5",
+    "0x1a7ba55c069331a5079DF14CC8C2351589A0aCFA",
+]
+
+// Union all EA users and remove QACC users
+const allEAUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users, ...S2Users, ...teamsVestings])];
+const totalUsers = [...new Set([...allEAUsers, ...qaccUsers])];
+const finalUsers = allEAUsers.filter(user => !qaccUsers.includes(user));
+
+console.log(`Total EA users + Season 2 + teams vestings: ${allEAUsers.length}`);
+console.log(`QACC users to remove: ${qaccUsers.length}`);
+console.log(`Total users: ${totalUsers.length}`);
+console.log(`Final users after removing QACC: ${finalUsers.length}`);
+
+generateTransactionJson(fundingPotMSAddress, projectName, paymentProcessor, paymentRouterAddress, qaccUsers);
 console.log("Done!");

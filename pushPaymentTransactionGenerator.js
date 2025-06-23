@@ -1,5 +1,6 @@
 import fs from 'fs';
 import { ethers } from 'ethers';
+import { on } from 'events';
 
 const FUNCTION_SELECTORS = {
     approve: "0x095ea7b3",
@@ -38,31 +39,59 @@ function getUserDataFromTransactions(transactions) {
     return userData;
 }
 
-function buildTransactions(toAddress, userData, abcTokenAddress, start, cliff, end) {
+function buildTransactions(toAddress, userData, abcTokenAddress, start, cliff, end, addressToFilter, onlyFilteredUsers) {
     const transactions = [];
     for (const user of userData) {
-        transactions.push({
-            to: toAddress,
-            value: "0",
-            data: FUNCTION_SELECTORS.pushPayment + ethers.AbiCoder.defaultAbiCoder().encode(
-                ["address", "address", "uint256", "uint256", "uint256", "uint256"], [user.address, abcTokenAddress, user.amount, start, cliff, end]
-            ).slice(2),
-            contractMethod: "pushPayment(address,address,uint256,uint256,uint256,uint256)",
-            contractInputsValues: [
-                user.address,
-                abcTokenAddress,
-                user.amount,
-                start.toString(),
-                cliff.toString(),
-                end.toString()
-            ]
-        })
+        let amountToPush = user.amount;
+        if (addressToFilter.some(address => address.address.toLowerCase() === user.address.toLowerCase())) {
+            console.log(`✅ Found matching address: ${user.address}`);
+            console.log(`Deducting ${addressToFilter.find(address => address.address.toLowerCase() === user.address.toLowerCase()).amountToDeduct} from ${user.amount}`);
+            const amountToDeduct = addressToFilter.find(address => address.address.toLowerCase() === user.address.toLowerCase()).amountToDeduct;
+            amountToPush = (BigInt(user.amount) - BigInt(amountToDeduct)).toString();
+            console.log(`💰 New amount after deduction: ${amountToPush}`);
+            if (onlyFilteredUsers) {
+                transactions.push({
+                    to: toAddress,
+                    value: "0",
+                    data: FUNCTION_SELECTORS.pushPayment + ethers.AbiCoder.defaultAbiCoder().encode(
+                        ["address", "address", "uint256", "uint256", "uint256", "uint256"], [user.address, abcTokenAddress, amountToPush, start, cliff, end]
+                    ).slice(2),
+                    contractMethod: "pushPayment(address,address,uint256,uint256,uint256,uint256)",
+                    contractInputsValues: [
+                        user.address,
+                        abcTokenAddress,
+                        amountToPush,
+                        start.toString(),
+                        cliff.toString(),
+                        end.toString()
+                    ]
+                })
+            }
+        }
+        if (!onlyFilteredUsers) {
+            transactions.push({
+                to: toAddress,
+                value: "0",
+                data: FUNCTION_SELECTORS.pushPayment + ethers.AbiCoder.defaultAbiCoder().encode(
+                    ["address", "address", "uint256", "uint256", "uint256", "uint256"], [user.address, abcTokenAddress, amountToPush, start, cliff, end]
+                ).slice(2),
+                contractMethod: "pushPayment(address,address,uint256,uint256,uint256,uint256)",
+                contractInputsValues: [
+                    user.address,
+                    abcTokenAddress,
+                    amountToPush,
+                    start.toString(),
+                    cliff.toString(),
+                    end.toString()
+                ]
+            })
+        }
     }
     return transactions;
 }
 
 
-function generateTransactionJson(safe, projectName, client, userData, abcTokenAddress, start, cliff, end) {
+function generateTransactionJson(safe, projectName, client, userData, abcTokenAddress, start, cliff, end, addressToFilter, onlyFilteredUsers) {
     const batchSize = 25;
     const totalUsers = userData.length;
     const totalBatches = Math.ceil(totalUsers / batchSize);
@@ -72,32 +101,35 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
         const startIndex = batchIndex * batchSize;
         const endIndex = Math.min(startIndex + batchSize, totalUsers);
         const batchUsers = userData.slice(startIndex, endIndex);
+        const transactions = buildTransactions(client, batchUsers, abcTokenAddress, start, cliff, end, addressToFilter, onlyFilteredUsers)
 
-        const transactionData = {
-            version: "1.0",
-            chainId: "137", // Polygon Mainnet
-            createdAt: currentTimestamp,
-            meta: {
-                name: `[PUSH-PAYMENTS]-[${projectName}]-[QACC-ROUND-1]-[TX-${batchIndex}]`,
-                description: `Batch ${batchIndex + 1} for ${projectName}`,
-                txBuilderVersion: "",
-                createdFromSafeAddress: safe,
-                createdFromOwnerAddress: "",
-                checksum: ""
-            },
-            transactions: buildTransactions(client, batchUsers, abcTokenAddress, start, cliff, end)
-        };
+        if (transactions.length > 0) {
+            const transactionData = {
+                version: "1.0",
+                chainId: "137", // Polygon Mainnet
+                createdAt: currentTimestamp,
+                meta: {
+                    name: `[PUSH-PAYMENTS]-[${projectName}]-[QACC-ROUND-1]-[TX-${batchIndex}]`,
+                    description: `Batch ${batchIndex + 1} for ${projectName}`,
+                    txBuilderVersion: "",
+                    createdFromSafeAddress: safe,
+                    createdFromOwnerAddress: "",
+                    checksum: ""
+                },
+                transactions
+            };
 
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '').replace('T', '_').slice(0, 15);
-        const filename = `transactions_${projectName}_batch${batchIndex + 1}_${timestamp}.json`;
-        fs.writeFileSync(filename, JSON.stringify(transactionData, null, 2));
-        console.log(`Transaction file generated: ${filename}`);
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '').replace('T', '_').slice(0, 15);
+            const filename = `transactions_${projectName}_batch${batchIndex + 1}_${timestamp}.json`;
+            fs.writeFileSync(filename, JSON.stringify(transactionData, null, 2));
+            console.log(`Transaction file generated: ${filename}`);
+        }
     }
 }
 
 
 
-const projectName = 'CITIZEN';
+const projectName = 'CTZN';
 // const paymentProcessor = "0xDE1811172756feb79a4c937246B320d36615C184"; // akarun
 const paymentRouterAddress = "0x0DDd250bfb440e6deF3157eE29747e8ac29153aD"; // client
 const fundingPotMSAddress = "0x9D0eEb8bF5B2C3ec6800b9A55195F567e72f1eC4";
@@ -109,10 +141,16 @@ const cliff = 0;
 const end = 1766224800;
 
 
-const filesData = readTransactionFile("4.json");
+const filesData = readTransactionFile("CITIZEN-qacc.json");
 const userData = getUserDataFromTransactions(filesData.transactions.readable);
 
-generateTransactionJson(fundingPotMSAddress, projectName, paymentRouterAddress, userData, abcTokenAddress, start, cliff, end);
+const addressToFilter = [{
+    address: "0x313a58f11D8cF6f1667B7C8D615BD93B8c3F49Cb",
+    amountToDeduct: "2458969994900000000000"
+}]
+const onlyFilteredUsers = false;
+
+generateTransactionJson(fundingPotMSAddress, projectName, paymentRouterAddress, userData, abcTokenAddress, start, cliff, end, addressToFilter, onlyFilteredUsers);
 console.log("Done!");
 
 // const testTx = {

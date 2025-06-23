@@ -2,7 +2,7 @@
 *.json
 
 # txs
-.oldTXs
+oldTXs
 
 # node_modules
 node_modules
