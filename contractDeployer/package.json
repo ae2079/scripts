@@ -1,0 +1,34 @@
+{
+    "name": "proxy-contract-deployer",
+    "version": "1.0.0",
+    "description": "A flexible proxy contract that forwards buy and sell calls to any target contract address",
+    "main": "contractDeployer.js",
+    "scripts": {
+        "deploy": "npx hardhat run scripts/deploy.js --network polygon",
+        "deploy:local": "npx hardhat run scripts/deploy.js --network hardhat",
+        "interact": "npx hardhat run scripts/interact.js --network polygon",
+        "compile": "npx hardhat compile",
+        "test": "npx hardhat test",
+        "clean": "npx hardhat clean"
+    },
+    "keywords": [
+        "ethereum",
+        "solidity",
+        "proxy",
+        "contract",
+        "deployment",
+        "hardhat"
+    ],
+    "author": "",
+    "license": "MIT",
+    "devDependencies": {
+        "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+        "hardhat": "^2.19.0"
+    },
+    "dependencies": {
+        "dotenv": "^16.3.1"
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    }
+}
