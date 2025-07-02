@@ -9,7 +9,8 @@
         "interact": "npx hardhat run scripts/interact.js --network polygon",
         "compile": "npx hardhat compile",
         "test": "npx hardhat test",
-        "clean": "npx hardhat clean"
+        "clean": "npx hardhat clean",
+        "verify": "npx hardhat verify --network polygon"
     },
     "keywords": [
         "ethereum",
