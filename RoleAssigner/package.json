@@ -1,0 +1,16 @@
+{
+    "name": "role-transaction-generator",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "Generate role assignment transaction JSON files",
+    "main": "generateRoleTransaction.js",
+    "scripts": {
+        "start": "node generateRoleTransaction.js"
+    },
+    "dependencies": {
+        "ethers": "^6.0.0"
+    },
+    "keywords": ["ethereum", "transactions", "roles", "safe"],
+    "author": "",
+    "license": "MIT"
+}
