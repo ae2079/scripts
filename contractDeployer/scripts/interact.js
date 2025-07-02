@@ -3,26 +3,31 @@ const { ethers } = require("hardhat");
 async function main() {
     // Configuration
     const PROXY_CONTRACT_ADDRESS = "0x..."; // Replace with your deployed proxy contract address
-    const TARGET_CONTRACT_ADDRESS = "0x1234567890123456789012345678901234567890"; // Replace with target contract
+    const TARGET_CONTRACT_ADDRESS = "0x..."; // Replace with target contract
+    const COLLATERAL_TOKEN_ADDRESS = "0x..."; // Replace with collateral token address (e.g., WPOL, TPOL)
+    const TOKEN_TO_SELL_ADDRESS = "0x..."; // Replace with token to sell address (ABC token)
 
     console.log("🔄 Interacting with deployed proxy contract...");
     console.log("📍 Proxy contract:", PROXY_CONTRACT_ADDRESS);
     console.log("🎯 Target contract:", TARGET_CONTRACT_ADDRESS);
+    console.log("💰 Collateral token:", COLLATERAL_TOKEN_ADDRESS);
+    console.log("🪙 Token to sell:", TOKEN_TO_SELL_ADDRESS);
 
     // Get the deployed contract instance
     const proxyContract = await ethers.getContractAt("FlexibleProxyContract", PROXY_CONTRACT_ADDRESS);
 
     // Example parameters
-    const depositAmount = ethers.parseUnits("1.0", 18); // 1 ETH
-    const minAmountOut = ethers.parseUnits("0.95", 18); // 0.95 ETH minimum
+    const depositAmount = ethers.parseUnits("1.0", 18); // 1 token
+    const minAmountOut = ethers.parseUnits("0.95", 18); // 0.95 tokens minimum
 
     console.log("\n📋 Example 1: Calling buy function");
-    console.log(`💰 Deposit amount: ${ethers.formatEther(depositAmount)} ETH`);
-    console.log(`📉 Min amount out: ${ethers.formatEther(minAmountOut)} ETH`);
+    console.log(`💰 Deposit amount: ${ethers.formatEther(depositAmount)} tokens`);
+    console.log(`📉 Min amount out: ${ethers.formatEther(minAmountOut)} tokens`);
 
     try {
         const buyTx = await proxyContract.buy(
             TARGET_CONTRACT_ADDRESS,
+            COLLATERAL_TOKEN_ADDRESS,
             depositAmount,
             minAmountOut
         );
@@ -43,6 +48,7 @@ async function main() {
     try {
         const sellTx = await proxyContract.sell(
             TARGET_CONTRACT_ADDRESS,
+            TOKEN_TO_SELL_ADDRESS,
             depositAmount,
             minAmountOut
         );
@@ -58,11 +64,21 @@ async function main() {
         console.log("⚠️ Sell transaction failed (expected if target contract doesn't exist):", error.message);
     }
 
+    console.log("\n📋 Example 3: Checking if address is a contract");
+    try {
+        const isContract = await proxyContract.isContract(TARGET_CONTRACT_ADDRESS);
+        console.log(`🔍 Is target address a contract? ${isContract}`);
+    } catch (error) {
+        console.log("⚠️ Contract check failed:", error.message);
+    }
+
     console.log("\n" + "=".repeat(60));
     console.log("📖 INTERACTION SUMMARY");
     console.log("=".repeat(60));
     console.log("Proxy Contract:", PROXY_CONTRACT_ADDRESS);
     console.log("Target Contract:", TARGET_CONTRACT_ADDRESS);
+    console.log("Collateral Token:", COLLATERAL_TOKEN_ADDRESS);
+    console.log("Token to Sell:", TOKEN_TO_SELL_ADDRESS);
     console.log("Network:", (await ethers.provider.getNetwork()).name);
     console.log("=".repeat(60));
 }
