@@ -96,7 +96,7 @@ async function mintTokens(amount, contract) {
 }
 
 async function main() {
-    const provider = new ethers.JsonRpcProvider("https://lb.drpc.org/ogrpc?network=polygon&dkey=AkwVEpAy8kYom-mKjqkdWlWH4pw146oR76kzqi5fk9AX");
+    const provider = new ethers.JsonRpcProvider("https://polygon-rpc.com");
 
     try {
         // Connect to the contract
@@ -105,7 +105,7 @@ async function main() {
         const CONTRACT_ADDRESS = "0x2b3f6dced3c06a31af2b8fb5da8b48496198f3e2";
         // console.log(`\nData for ${project} project:`);
 
-        const privateKey = "23d91e100f795a6f0e58ee96726cfe7cd600fd48eec81d5bba2752925d197edf"
+        const privateKey = process.env.PRIVATE_KEY;
 
         const wallet = new ethers.Wallet(privateKey, provider);
 
