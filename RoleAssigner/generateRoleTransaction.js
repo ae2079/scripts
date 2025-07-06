@@ -1,21 +1,25 @@
 import { ethers } from "ethers";
 import authorizerABI from "./ABI/authorizerABI.js";
+import bondingCurveABI from "./ABI/bondingCurveABI.js";
 import fs from "fs";
 import path from "path";
+import { QACC_PROJECTS } from "./configs.js";
 
 // Configuration - Update these values as needed
 const CONFIG = {
     // Contract addresses
-    ORCHESTRATOR_CONTRACT_ADDRESS: "0x28c066bb3a518c41623fc1e282cb491243b6ebc5", // Replace with orchestrator address
     BONDING_CURVE_CONTRACT_ADDRESS: "0x6ff76740bdc5a5916fcf081e022eed3243024a14", // Replace with bonding curve address
     POLYGON_RPC_URL: "https://polygon-rpc.com", // Replace with your RPC URL
 
     // Role configuration
     ROLE_NAME: "CURVE_USER", // The role name to grant
-    TARGET_ADDRESS: "0xf8EFA36A3C6F1233a4144F5fcA614a28b1fBADEC", // The address to grant the role to
+    TARGET_ADDRESS: "0x84Ed70229D6Fc49d3624a81C8334cC0748ff0f5B", // The address to grant the role to
+    // proxy contract address: 0x84Ed70229D6Fc49d3624a81C8334cC0748ff0f5B
 
     // Safe configuration
-    SAFE_ADDRESS: "0x8DDF607FcFb260798Ae450cfc15292a75B4D4850", // Workflow Admin Multisig
+    SAFE_ADDRESS: "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e", // Workflow Admin Multisig
+    // for staging: 0x8DDF607FcFb260798Ae450cfc15292a75B4D4850
+    // for production: 0x9298fD550E2c02AdeBf781e08214E4131CDeC44e
 
     // Output configuration
     OUTPUT_DIR: "./transactions", // Directory to save transaction files
@@ -32,10 +36,20 @@ const ORCHESTRATOR_ABI = [{
     type: "function",
 }];
 
+async function getOrchestratorAddress(bondingCurveAddress) {
+    const bondignCurveContract = new ethers.Contract(
+        bondingCurveAddress,
+        bondingCurveABI,
+        new ethers.JsonRpcProvider(CONFIG.POLYGON_RPC_URL)
+    );
+    return await bondignCurveContract.orchestrator();
+}
+
 async function getAuthorizerAddress() {
     try {
+        const orchestratorAddress = await getOrchestratorAddress(CONFIG.BONDING_CURVE_CONTRACT_ADDRESS);
         const orchestratorContract = new ethers.Contract(
-            CONFIG.ORCHESTRATOR_CONTRACT_ADDRESS,
+            orchestratorAddress,
             ORCHESTRATOR_ABI,
             new ethers.JsonRpcProvider(CONFIG.POLYGON_RPC_URL)
         );
@@ -258,12 +272,137 @@ async function generateRoleTransactionsForMultipleAddresses(addresses) {
     }
 }
 
+// Function to execute role generation for all projects
+async function executeForAllProjects() {
+    console.log("🚀 Starting role transaction generation for all projects...");
+    console.log(`📋 Found ${Object.keys(QACC_PROJECTS).length} projects to process`);
+
+    const allTransactions = [];
+    const results = [];
+
+    for (const [projectSymbol, projectConfig] of Object.entries(QACC_PROJECTS)) {
+        console.log(`\n🔄 Processing project: ${projectSymbol}`);
+        console.log(`   - Bonding Curve: ${projectConfig.bondingCurve}`);
+        console.log(`   - Token: ${projectConfig.token}`);
+
+        try {
+            CONFIG.BONDING_CURVE_CONTRACT_ADDRESS = projectConfig.bondingCurve;
+            CONFIG.PROJECT_NAME = projectSymbol;
+
+            // Get authorizer address for this project
+            const authorizerAddress = await getAuthorizerAddress();
+            const authorizerContract = new ethers.Contract(
+                authorizerAddress,
+                authorizerABI,
+                new ethers.JsonRpcProvider(CONFIG.POLYGON_RPC_URL)
+            );
+
+            // Generate role ID for this project
+            const roleId = await generateRoleId(authorizerContract);
+
+            // Check if target address already has role
+            const hasRoleAlready = await hasRole(authorizerContract, roleId, CONFIG.TARGET_ADDRESS);
+
+            if (hasRoleAlready) {
+                console.log(`⚠️  Skipped ${projectSymbol} - address already has role`);
+                results.push({
+                    project: projectSymbol,
+                    success: false,
+                    reason: "Address already has role"
+                });
+                continue;
+            }
+
+            // Build transaction for this project
+            const transaction = {
+                to: authorizerAddress,
+                value: "0",
+                data: "0x2f2ff15d" + ethers.AbiCoder.defaultAbiCoder().encode(
+                    ["bytes32", "address"], [roleId, CONFIG.TARGET_ADDRESS]
+                ).slice(2),
+                contractMethod: "grantRole(bytes32,address)",
+                contractInputsValues: [
+                    roleId,
+                    CONFIG.TARGET_ADDRESS,
+                ]
+            };
+
+            allTransactions.push(transaction);
+
+            results.push({
+                project: projectSymbol,
+                success: true,
+                data: {
+                    authorizerAddress,
+                    roleId,
+                    userAddress: CONFIG.TARGET_ADDRESS
+                }
+            });
+            console.log(`✅ Successfully processed ${projectSymbol}`);
+
+        } catch (error) {
+            console.error(`❌ Error processing ${projectSymbol}:`, error.message);
+            results.push({
+                project: projectSymbol,
+                success: false,
+                error: error.message
+            });
+        }
+    }
+
+    // Generate single batched transaction file if we have transactions
+    if (allTransactions.length > 0) {
+        console.log(`\n📦 Creating batched transaction file with ${allTransactions.length} transactions...`);
+
+        ensureOutputDirectory();
+
+        const transactionData = {
+            version: "1.0",
+            chainId: "137", // Polygon Mainnet
+            createdAt: Date.now(),
+            meta: {
+                name: `[ROLE-GRANT]-[ALL-PROJECTS]-[${CONFIG.ROLE_NAME}]-[BATCHED]`,
+                description: `Batched role grant transactions for all projects - Grant ${CONFIG.ROLE_NAME} role to ${CONFIG.TARGET_ADDRESS}`,
+                txBuilderVersion: "",
+                createdFromSafeAddress: CONFIG.SAFE_ADDRESS,
+                createdFromOwnerAddress: "",
+                checksum: ""
+            },
+            transactions: allTransactions
+        };
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '').replace('T', '_').slice(0, 15);
+        const filename = `role_grant_all_projects_batched_${timestamp}.json`;
+        const filePath = path.join(CONFIG.OUTPUT_DIR, filename);
+
+        fs.writeFileSync(filePath, JSON.stringify(transactionData, null, 2));
+        console.log(`✅ Batched transaction file generated: ${filename}`);
+        console.log(`📊 Total transactions: ${allTransactions.length}`);
+    }
+
+    // Print summary
+    console.log("\n📊 Processing Summary:");
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    console.log(`   ✅ Successful: ${successful}`);
+    console.log(`   ❌ Failed: ${failed}`);
+    console.log(`   📦 Batched transactions: ${allTransactions.length}`);
+
+    if (failed > 0) {
+        console.log("\n❌ Failed projects:");
+        results.filter(r => !r.success).forEach(r => {
+            console.log(`   - ${r.project}: ${r.reason || r.error}`);
+        });
+    }
+
+    return results;
+}
+
 // Main execution function
 async function main() {
     console.log("🚀 Starting role transaction generation...");
     console.log("📋 Configuration:");
-    console.log(`   - Orchestrator: ${CONFIG.ORCHESTRATOR_CONTRACT_ADDRESS}`);
-    console.log(`   - Bonding Curve: ${CONFIG.BONDING_CURVE_CONTRACT_ADDRESS}`);
+    // console.log(`   - Bonding Curve: ${CONFIG.BONDING_CURVE_CONTRACT_ADDRESS}`);
     console.log(`   - Target Address: ${CONFIG.TARGET_ADDRESS}`);
     console.log(`   - Role Name: ${CONFIG.ROLE_NAME}`);
     console.log(`   - Safe Address: ${CONFIG.SAFE_ADDRESS}`);
@@ -272,7 +411,7 @@ async function main() {
         // Example usage:
 
         // 1. Generate transaction for a single address (uses CONFIG.TARGET_ADDRESS)
-        await generateRoleTransaction();
+        // await generateRoleTransaction();
 
         // 2. Generate transaction for a specific address
         // await generateRoleTransaction("0x1234567890123456789012345678901234567890");
@@ -283,6 +422,9 @@ async function main() {
         //     "0x0987654321098765432109876543210987654321"
         // ];
         // await generateRoleTransactionsForMultipleAddresses(addresses);
+
+        // 4. Execute for all projects
+        await executeForAllProjects();
 
         console.log("✅ Done!");
     } catch (error) {
