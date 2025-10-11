@@ -92,22 +92,26 @@ async function executeWithRetry(fn, context = '') {
         } catch (error) {
             lastError = error;
 
-            if (isRateLimitError(error)) {
-                circuitBreakerState.failureCount++;
-                circuitBreakerState.lastFailureTime = Date.now();
-                circuitBreakerState.isOpen = true;
+            if (attempt < CIRCUIT_BREAKER_CONFIG.maxRetries) {
+                if (isRateLimitError(error)) {
+                    // Rate limit error - use longer delays and open circuit breaker
+                    circuitBreakerState.failureCount++;
+                    circuitBreakerState.lastFailureTime = Date.now();
+                    circuitBreakerState.isOpen = true;
 
-                if (attempt < CIRCUIT_BREAKER_CONFIG.maxRetries) {
                     const delay = calculateBackoffDelay(attempt);
                     console.log(`   ⚠️  Rate limit detected (attempt ${attempt + 1}/${CIRCUIT_BREAKER_CONFIG.maxRetries + 1})`);
                     console.log(`   🔄 Retrying ${context} after ${(delay / 1000).toFixed(1)}s delay...`);
                     await sleep(delay);
                 } else {
-                    console.log(`   ❌ Max retries (${CIRCUIT_BREAKER_CONFIG.maxRetries}) reached for ${context}`);
-                    throw error;
+                    // Other errors - use shorter delay and retry
+                    const shortDelay = Math.min(1000 * Math.pow(1.5, attempt), 10000); // 1s, 1.5s, 2.25s, 3.37s, 5s, 7.5s, 10s max
+                    console.log(`   ⚠️  Request failed (attempt ${attempt + 1}/${CIRCUIT_BREAKER_CONFIG.maxRetries + 1}): ${error.message.substring(0, 100)}...`);
+                    console.log(`   🔄 Retrying ${context} after ${(shortDelay / 1000).toFixed(1)}s delay...`);
+                    await sleep(shortDelay);
                 }
             } else {
-                // Non-rate-limit error, throw immediately
+                console.log(`   ❌ Max retries (${CIRCUIT_BREAKER_CONFIG.maxRetries}) reached for ${context}`);
                 throw error;
             }
         }
