@@ -97,6 +97,20 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
     const totalBatches = Math.ceil(totalUsers / batchSize);
     const currentTimestamp = Date.now();
 
+    // Create project folder and pushPayment subfolder if they don't exist
+    const projectFolder = `./${projectName}`;
+    const pushPaymentFolder = `${projectFolder}/pushPayment`;
+
+    if (!fs.existsSync(projectFolder)) {
+        fs.mkdirSync(projectFolder, { recursive: true });
+        console.log(`📁 Created project folder: ${projectFolder}`);
+    }
+
+    if (!fs.existsSync(pushPaymentFolder)) {
+        fs.mkdirSync(pushPaymentFolder, { recursive: true });
+        console.log(`📁 Created pushPayment folder: ${pushPaymentFolder}`);
+    }
+
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
         const startIndex = batchIndex * batchSize;
         const endIndex = Math.min(startIndex + batchSize, totalUsers);
@@ -121,33 +135,31 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
 
             const timestamp = new Date().toISOString().replace(/[:.]/g, '').replace('T', '_').slice(0, 15);
             const filename = `transactions_${projectName}_batch${batchIndex + 1}_${timestamp}.json`;
-            fs.writeFileSync(filename, JSON.stringify(transactionData, null, 2));
-            console.log(`Transaction file generated: ${filename}`);
+            const filePath = `${pushPaymentFolder}/${filename}`;
+            fs.writeFileSync(filePath, JSON.stringify(transactionData, null, 2));
+            console.log(`Transaction file generated: ${filePath}`);
         }
     }
 }
 
 
 
-const projectName = 'CTZN';
+const projectName = 'X23';
 // const paymentProcessor = "0xDE1811172756feb79a4c937246B320d36615C184"; // akarun
-const paymentRouterAddress = "0x0DDd250bfb440e6deF3157eE29747e8ac29153aD"; // client
-const fundingPotMSAddress = "0x9D0eEb8bF5B2C3ec6800b9A55195F567e72f1eC4";
+const paymentRouterAddress = "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be"; // client
+const fundingPotMSAddress = "0xe077bC743b10833cC938cd5700F92316d5dA11Bf";
 // const workflowAdminAddress = "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e";
-const abcTokenAddress = "0x0D9B0790E97e3426C161580dF4Ee853E4A7C4607";
+const abcTokenAddress = "0xc530B75465Ce3c6286e718110A7B2e2B64Bdc860";
 
-const start = 1750413600;
+const start = 1760371200;
 const cliff = 0;
-const end = 1766224800;
+const end = 1773417600;
 
 
-const filesData = readTransactionFile("CITIZEN-qacc.json");
+const filesData = readTransactionFile("5.json");
 const userData = getUserDataFromTransactions(filesData.transactions.readable);
 
-const addressToFilter = [{
-    address: "0x313a58f11D8cF6f1667B7C8D615BD93B8c3F49Cb",
-    amountToDeduct: "2458969994900000000000"
-}]
+const addressToFilter = []
 const onlyFilteredUsers = false;
 
 generateTransactionJson(fundingPotMSAddress, projectName, paymentRouterAddress, userData, abcTokenAddress, start, cliff, end, addressToFilter, onlyFilteredUsers);
