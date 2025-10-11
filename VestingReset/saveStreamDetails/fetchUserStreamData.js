@@ -5,7 +5,8 @@ import { ethers } from 'ethers';
 const PAYMENT_PROCESSOR_ABI = [
     "function viewAllPaymentOrders(address client, address paymentReceiver) external view returns (tuple(address token, uint256 streamId, uint256 amount, uint256 start, uint256 cliff, uint256 end)[])",
     "function releasableForSpecificStream(address client, address paymentReceiver, uint256 streamId) external view returns (uint256)",
-    "function releasedForSpecificStream(address client, address paymentReceiver, uint256 streamId) external view returns (uint256)"
+    "function releasedForSpecificStream(address client, address paymentReceiver, uint256 streamId) external view returns (uint256)",
+    "function isActivePaymentReceiver(address client, address paymentReceiver) external view returns (bool)"
 ];
 
 // Configuration
@@ -31,7 +32,7 @@ let circuitBreakerState = {
 
 // Check if error is a rate limit error
 function isRateLimitError(error) {
-    const errorMessage = error.message ? .toLowerCase() || '';
+    const errorMessage = (error.message || '').toLowerCase();
     const errorCode = error.code;
 
     return (
@@ -213,12 +214,39 @@ async function fetchStreamDataForUser(contract, client, userAddress) {
         };
 
     } catch (error) {
-        console.error(`   ❌ Error fetching payment orders for ${userAddress}:`, error.message);
-        return {
-            address: userAddress,
-            error: error.message,
-            streams: []
-        };
+        // Check if user is an active receiver before showing error
+        try {
+            const isActive = await executeWithRetry(
+                async() => await contract.isActivePaymentReceiver(client, userAddress),
+                `isActivePaymentReceiver for ${userAddress}`
+            );
+
+            if (isActive) {
+                console.error(`   ❌ Error fetching payment orders for ACTIVE receiver ${userAddress}:`, error.message);
+                return {
+                    address: userAddress,
+                    error: error.message,
+                    isActiveReceiver: true,
+                    streams: []
+                };
+            } else {
+                // User is not an active receiver, silently skip
+                console.log(`   ℹ️  User ${userAddress} is not an active payment receiver - skipping`);
+                return {
+                    address: userAddress,
+                    isActiveReceiver: false,
+                    streams: []
+                };
+            }
+        } catch (activeCheckError) {
+            // If we can't check active status, log the original error
+            console.error(`   ❌ Error fetching payment orders for ${userAddress}:`, error.message);
+            return {
+                address: userAddress,
+                error: error.message,
+                streams: []
+            };
+        }
     }
 }
 
