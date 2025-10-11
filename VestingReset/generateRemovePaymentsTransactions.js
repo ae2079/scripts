@@ -61,6 +61,20 @@ function generateTransactionJson(safe, projectName, paymentProcessor, client, us
     const totalBatches = Math.ceil(totalUsers / batchSize);
     const currentTimestamp = Date.now();
 
+    // Create project folder and removePayment subfolder if they don't exist
+    const projectFolder = `./${projectName}`;
+    const removePaymentFolder = `${projectFolder}/removePayment`;
+
+    if (!fs.existsSync(projectFolder)) {
+        fs.mkdirSync(projectFolder, { recursive: true });
+        console.log(`📁 Created project folder: ${projectFolder}`);
+    }
+
+    if (!fs.existsSync(removePaymentFolder)) {
+        fs.mkdirSync(removePaymentFolder, { recursive: true });
+        console.log(`📁 Created removePayment folder: ${removePaymentFolder}`);
+    }
+
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
         const startIndex = batchIndex * batchSize;
         const endIndex = Math.min(startIndex + batchSize, totalUsers);
@@ -83,8 +97,9 @@ function generateTransactionJson(safe, projectName, paymentProcessor, client, us
 
         const timestamp = new Date().toISOString().replace(/[:.]/g, '').replace('T', '_').slice(0, 15);
         const filename = `transactions_batch${batchIndex + 1}_${timestamp}.json`;
-        fs.writeFileSync(filename, JSON.stringify(transactionData, null, 2));
-        console.log(`Transaction file generated: ${filename}`);
+        const filePath = `${removePaymentFolder}/${filename}`;
+        fs.writeFileSync(filePath, JSON.stringify(transactionData, null, 2));
+        console.log(`Transaction file generated: ${filePath}`);
     }
 }
 
@@ -133,5 +148,11 @@ console.log(`QACC users to remove: ${qaccUsers.length}`);
 console.log(`Total users: ${totalUsers.length}`);
 console.log(`Final users after removing QACC: ${finalUsers.length}`);
 
-generateTransactionJson(fundingPotMSAddress, projectName, paymentProcessor, paymentRouterAddress, qaccUsers);
+// generateTransactionJson(fundingPotMSAddress, projectName, paymentProcessor, paymentRouterAddress, qaccUsers);
+
+const s2UsersWithoutQacc = S2Users.filter(user => !qaccUsers.includes(user));
+
+console.log(`S2 users without QACC: ${s2UsersWithoutQacc.length}`);
+generateTransactionJson(fundingPotMSAddress, projectName, paymentProcessor, paymentRouterAddress, s2UsersWithoutQacc);
+
 console.log("Done!");

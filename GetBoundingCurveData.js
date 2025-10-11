@@ -105,11 +105,11 @@ async function main() {
         const CONTRACT_ADDRESS = "0x2b3f6dced3c06a31af2b8fb5da8b48496198f3e2";
         // console.log(`\nData for ${project} project:`);
 
-        const privateKey = process.env.PRIVATE_KEY;
+        // const privateKey = process.env.PRIVATE_KEY;
 
-        const wallet = new ethers.Wallet(privateKey, provider);
+        // const wallet = new ethers.Wallet(privateKey, provider);
 
-        const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, wallet);
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
         // Call methods and log their outputs
         const buyFee = await contract.buyFee();
         console.log("Buy Fee:", buyFee.toString());
