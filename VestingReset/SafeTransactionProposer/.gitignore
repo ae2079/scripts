@@ -1,0 +1,23 @@
+# Environment variables
+.env
+.env.local
+
+# Node modules
+node_modules/
+
+# Generated transaction files
+*/pushPayment/*.json
+*/removePayment/*.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
