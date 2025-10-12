@@ -41,25 +41,32 @@ function getUserDataFromTransactions(transactions) {
 
 function buildTransactions(toAddress, userData, abcTokenAddress, start, cliff, end, addressToFilter, onlyFilteredUsers) {
     const transactions = [];
+
+    // Checksum addresses to ensure proper format
+    const checksummedToAddress = ethers.getAddress(toAddress);
+    const checksummedTokenAddress = ethers.getAddress(abcTokenAddress);
+
     for (const user of userData) {
+        const checksummedUserAddress = ethers.getAddress(user.address);
         let amountToPush = user.amount;
+
         if (addressToFilter.some(address => address.address.toLowerCase() === user.address.toLowerCase())) {
-            console.log(`✅ Found matching address: ${user.address}`);
+            console.log(`✅ Found matching address: ${checksummedUserAddress}`);
             console.log(`Deducting ${addressToFilter.find(address => address.address.toLowerCase() === user.address.toLowerCase()).amountToDeduct} from ${user.amount}`);
             const amountToDeduct = addressToFilter.find(address => address.address.toLowerCase() === user.address.toLowerCase()).amountToDeduct;
             amountToPush = (BigInt(user.amount) - BigInt(amountToDeduct)).toString();
             console.log(`💰 New amount after deduction: ${amountToPush}`);
             if (onlyFilteredUsers) {
                 transactions.push({
-                    to: toAddress,
+                    to: checksummedToAddress,
                     value: "0",
                     data: FUNCTION_SELECTORS.pushPayment + ethers.AbiCoder.defaultAbiCoder().encode(
-                        ["address", "address", "uint256", "uint256", "uint256", "uint256"], [user.address, abcTokenAddress, amountToPush, start, cliff, end]
+                        ["address", "address", "uint256", "uint256", "uint256", "uint256"], [checksummedUserAddress, checksummedTokenAddress, amountToPush, start, cliff, end]
                     ).slice(2),
                     contractMethod: "pushPayment(address,address,uint256,uint256,uint256,uint256)",
                     contractInputsValues: [
-                        user.address,
-                        abcTokenAddress,
+                        checksummedUserAddress,
+                        checksummedTokenAddress,
                         amountToPush,
                         start.toString(),
                         cliff.toString(),
@@ -70,15 +77,15 @@ function buildTransactions(toAddress, userData, abcTokenAddress, start, cliff, e
         }
         if (!onlyFilteredUsers) {
             transactions.push({
-                to: toAddress,
+                to: checksummedToAddress,
                 value: "0",
                 data: FUNCTION_SELECTORS.pushPayment + ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "address", "uint256", "uint256", "uint256", "uint256"], [user.address, abcTokenAddress, amountToPush, start, cliff, end]
+                    ["address", "address", "uint256", "uint256", "uint256", "uint256"], [checksummedUserAddress, checksummedTokenAddress, amountToPush, start, cliff, end]
                 ).slice(2),
                 contractMethod: "pushPayment(address,address,uint256,uint256,uint256,uint256)",
                 contractInputsValues: [
-                    user.address,
-                    abcTokenAddress,
+                    checksummedUserAddress,
+                    checksummedTokenAddress,
                     amountToPush,
                     start.toString(),
                     cliff.toString(),
@@ -96,6 +103,9 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
     const totalUsers = userData.length;
     const totalBatches = Math.ceil(totalUsers / batchSize);
     const currentTimestamp = Date.now();
+
+    // Checksum the Safe address to ensure proper format
+    const checksummedSafeAddress = ethers.getAddress(safe);
 
     // Create project folder and pushPayment subfolder if they don't exist
     const projectFolder = `./${projectName}`;
@@ -126,7 +136,7 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
                     name: `[PUSH-PAYMENTS]-[${projectName}]-[QACC-ROUND-1]-[TX-${batchIndex}]`,
                     description: `Batch ${batchIndex + 1} for ${projectName}`,
                     txBuilderVersion: "",
-                    createdFromSafeAddress: safe,
+                    createdFromSafeAddress: checksummedSafeAddress,
                     createdFromOwnerAddress: "",
                     checksum: ""
                 },

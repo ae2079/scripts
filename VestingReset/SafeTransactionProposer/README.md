@@ -13,9 +13,10 @@ And proposes them to your Safe multisig wallet, so other owners can review and a
 ## Features
 
 - ✅ Proposes single transaction files or entire directories (batch mode)
+- ✅ **Automatic nonce management** - assigns sequential nonces to prevent conflicts
 - ✅ Uses Safe SDK for secure transaction submission
 - ✅ Verifies signer is a Safe owner before proposing
-- ✅ Provides detailed progress and summary reports
+- ✅ Provides detailed progress and summary reports with nonce tracking
 - ✅ Includes rate limiting protection between batches
 - ✅ Supports all Safe-compatible chains (Ethereum, Polygon, Arbitrum, etc.)
 
@@ -117,13 +118,15 @@ Create a `.env` file (copy from `.env.example`):
 # Required
 PRIVATE_KEY=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
 
-# Optional - Override defaults
-SAFE_ADDRESS=0xe077bC743b10833cC938cd5700F92316d5dA11Bf
+# Optional - Override defaults (usually not needed)
 CHAIN_ID=137
 RPC_URL=https://polygon-rpc.com
 ```
 
-**⚠️ SECURITY**: The `.env` file is in `.gitignore` and will never be committed.
+**Notes:**
+- **⚠️ SECURITY**: The `.env` file is in `.gitignore` and will never be committed.
+- **Safe Address**: Automatically extracted from transaction files (no config needed)
+- **MultiSend Contract**: The script uses MultiSendCallOnly (0x9641d764fc13c8B624c04430C7356C1C7C8102e2) for batch transactions
 
 ### 2. Edit CONFIG in Code
 
@@ -133,21 +136,23 @@ Edit the `CONFIG` object in `proposeSafeTransactions.js`:
 const CONFIG = {
     CHAIN_ID: '137',        // Polygon Mainnet
     RPC_URL: 'https://polygon-rpc.com',
-    SAFE_ADDRESS: '0xe077bC743b10833cC938cd5700F92316d5dA11Bf'
+    // MultiSendCallOnly 1.4.1 contract - uses CALL instead of DELEGATE_CALL
+    // Required for Safes with delegate calls disabled
+    MULTI_SEND_CALL_ONLY_ADDRESS: '0x9641d764fc13c8B624c04430C7356C1C7C8102e2'
 };
 ```
 
 ### 3. Command Line Arguments
 
-Override Safe address and Chain ID via command line:
+Override Chain ID via command line:
 
 ```bash
-node proposeSafeTransactions.js batch ../X23/pushPayment [SAFE_ADDRESS] [CHAIN_ID]
+node proposeSafeTransactions.js batch ../X23/pushPayment [CHAIN_ID]
 ```
 
 Example:
 ```bash
-node proposeSafeTransactions.js batch ../X23/pushPayment 0xCustomSafe 137
+node proposeSafeTransactions.js batch ../X23/pushPayment 137
 ```
 
 ### Priority Order
@@ -182,10 +187,48 @@ Transaction JSON → proposeSafeTransactions.js → Safe SDK → Safe API → Sa
 1. **Read**: Script reads transaction JSON files
 2. **Initialize**: Connects to Safe using SDK with your private key
 3. **Verify**: Checks that signer is a Safe owner
-4. **Format**: Converts transactions to Safe SDK format
-5. **Sign**: Signs the transaction with your private key
-6. **Propose**: Submits to Safe Transaction Service
-7. **View**: Transaction appears in Safe UI for other owners to approve
+4. **Get Nonce**: Retrieves current Safe nonce
+5. **Assign Nonces**: Assigns sequential nonces to each batch (e.g., 10, 11, 12...)
+6. **Format**: Converts transactions to Safe SDK format
+7. **Sign**: Signs each transaction with your private key
+8. **Propose**: Submits to Safe Transaction Service
+9. **View**: Transactions appear in Safe UI in correct order
+
+### Nonce Management 🔢
+
+When proposing **multiple batches**, the script automatically:
+- Gets the current Safe nonce (e.g., 10)
+- Assigns sequential nonces to each batch:
+  - Batch 1 → nonce 10
+  - Batch 2 → nonce 11
+  - Batch 3 → nonce 12
+  - etc.
+
+This prevents **nonce conflicts** where multiple transactions would have the same nonce and conflict with each other. Each batch gets its own unique nonce, ensuring they execute in the correct order.
+
+## How MultiSend Works
+
+When proposing multiple transactions in a batch, the script:
+
+1. **Manually encodes** each transaction using the MultiSend format:
+   - Operation (1 byte): `0` for CALL
+   - To address (20 bytes)
+   - Value (32 bytes)
+   - Data length (32 bytes)
+   - Transaction data (variable)
+
+2. **Concatenates** all encoded transactions into a single byte array
+
+3. **Creates a single Safe transaction** that DELEGATE_CALLs (operation 1) to the `multiSend(bytes)` function on the **MultiSendCallOnly** contract (`0x9641d764fc13c8B624c04430C7356C1C7C8102e2`)
+
+4. **MultiSendCallOnly executes in the Safe's context** and makes CALL (operation 0) to each target address
+
+This approach ensures that:
+- ✅ Safe DELEGATE_CALLs to MultiSendCallOnly (trusted Safe contract)
+- ✅ MultiSendCallOnly only makes CALLs to external addresses (not delegate calls)
+- ✅ Works with Safes that restrict DELEGATE_CALLs to untrusted contracts
+- ✅ Batch execution is atomic (all succeed or all fail)
+- ✅ More gas efficient than proposing individual transactions
 
 ## Transaction File Format
 
@@ -218,6 +261,17 @@ Generated transaction files follow the Safe Transaction Builder format:
 - Ensure the private key you're using belongs to a Safe owner
 - Verify the Safe address is correct
 - Check you're connected to the correct network
+
+### "CGW error - 422: Delegate call is disabled" or "Operation DELEGATE_CALL is not allowed"
+- **Fixed**: The script now **manually encodes** MultiSend transactions to use **MultiSendCallOnly** contract (0x9641d764fc13c8B624c04430C7356C1C7C8102e2)
+- Safe DELEGATE_CALLs to MultiSendCallOnly (trusted contract), which then makes CALLs to external addresses
+- This error occurred when using the regular MultiSend contract which DELEGATE_CALLs to external contracts
+- The fix uses MultiSendCallOnly which restricts operations to CALLs only
+- In the Safe UI, you should see:
+  - **To**: 0x9641d764fc13c8B624c04430C7356C1C7C8102e2 (Safe: MultiSendCallOnly 1.4.1)
+  - **Operation**: 1 (delegate call)
+  - ✅ This is correct! Safe delegates to MultiSendCallOnly, which then makes CALLs
+- If you still see this error, verify your Safe settings and MultiSend contract address
 
 ### "Rate limiting" or "Too many requests"
 - The script includes automatic delays between batches (2 seconds)

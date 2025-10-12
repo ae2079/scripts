@@ -1,3 +1,23 @@
+/**
+ * Safe Transaction Proposer
+ * 
+ * Proposes batch transactions to a Safe (Gnosis Safe) multisig wallet.
+ * 
+ * Key Features:
+ * - Manually encodes MultiSend transactions to use MultiSendCallOnly contract
+ * - Safe DELEGATE_CALLs to MultiSendCallOnly, which then makes CALLs to each target
+ * - Automatic sequential nonce management for multiple batches
+ * - Works with Safes that restrict DELEGATE_CALLs to external contracts
+ * 
+ * MultiSend Encoding:
+ * Each transaction is encoded as: operation(0=CALL) + to(20) + value(32) + dataLength(32) + data
+ * All transactions are concatenated and passed to MultiSendCallOnly.multiSend(bytes)
+ * The Safe DELEGATE_CALLs to MultiSendCallOnly (operation 1)
+ * MultiSendCallOnly then makes CALLs (operation 0) to each target address
+ * 
+ * Reference: https://github.com/safe-global/safe-core-sdk/issues/1168
+ */
+
 import fs from 'fs';
 import path from 'path';
 import { ethers } from 'ethers';
@@ -21,7 +41,35 @@ dotenv.config();
 const CONFIG = {
     CHAIN_ID: process.env.CHAIN_ID || '137', // Polygon Mainnet
     RPC_URL: process.env.RPC_URL || 'https://polygon-rpc.com', // Or use your preferred RPC
+    // MultiSendCallOnly 1.4.1 contract - Safe delegates to it, it makes CALLs to targets
+    // Required for Safes that restrict delegate calls to untrusted contracts
+    MULTI_SEND_CALL_ONLY_ADDRESS: '0x9641d764fc13c8B624c04430C7356C1C7C8102e2'
 };
+
+/**
+ * Encodes transactions for MultiSend contract
+ * Format: operation (1 byte) + to (20 bytes) + value (32 bytes) + dataLength (32 bytes) + data
+ */
+function encodeMultiSendData(transactions) {
+    const encodedTransactions = transactions.map(tx => {
+        const operation = 0; // 0 = Call
+        const to = tx.to;
+        const value = BigInt(tx.value || '0');
+        const data = tx.data || '0x';
+        const dataBytes = ethers.getBytes(data);
+        const dataLength = dataBytes.length;
+
+        // Encode: operation(1) + to(20) + value(32) + dataLength(32) + data
+        const encoded = ethers.solidityPacked(
+            ['uint8', 'address', 'uint256', 'uint256', 'bytes'], [operation, to, value, dataLength, data]
+        );
+
+        return encoded;
+    });
+
+    // Concatenate all encoded transactions
+    return ethers.concat(encodedTransactions);
+}
 
 /**
  * Reads a transaction JSON file and returns the parsed data
@@ -106,22 +154,37 @@ async function initializeSafe(privateKey, safeAddress, chainId) {
 /**
  * Proposes a batch of transactions to the Safe
  */
-async function proposeBatchTransaction(protocolKit, apiKit, signer, transactionData) {
+async function proposeBatchTransaction(protocolKit, apiKit, signer, transactionData, nonce) {
     try {
         console.log(`\n📝 Proposing transaction batch: ${transactionData.meta.name}`);
         console.log(`📊 Number of transactions in batch: ${transactionData.transactions.length}`);
+        console.log(`🔢 Using nonce: ${nonce}`);
 
-        // Format transactions for Safe SDK
-        const safeTransactions = transactionData.transactions.map(tx => ({
-            to: tx.to,
-            value: tx.value || '0',
-            data: tx.data,
-            operation: 0 // 0 = Call, 1 = DelegateCall
-        }));
+        // Manually encode MultiSend transaction to use MultiSendCallOnly contract
+        // Safe DELEGATE_CALLs to MultiSendCallOnly, which then makes CALLs to each target
+        console.log(`📦 Using MultiSendCallOnly contract: ${CONFIG.MULTI_SEND_CALL_ONLY_ADDRESS}`);
 
-        // Create Safe transaction
+        // Encode the batch of transactions for MultiSend
+        const encodedData = encodeMultiSendData(transactionData.transactions);
+
+        // Create the multiSend function call
+        const multiSendInterface = new ethers.Interface([
+            'function multiSend(bytes memory transactions)'
+        ]);
+        const multiSendData = multiSendInterface.encodeFunctionData('multiSend', [encodedData]);
+
+        // Create a single Safe transaction that DELEGATE_CALLs to MultiSendCallOnly
+        // The Safe uses DELEGATE_CALL (1) to MultiSendCallOnly, which then makes CALLs to each target
         const safeTransaction = await protocolKit.createTransaction({
-            transactions: safeTransactions
+            transactions: [{
+                to: CONFIG.MULTI_SEND_CALL_ONLY_ADDRESS,
+                value: '0',
+                data: multiSendData,
+                operation: 1 // 1 = DELEGATE_CALL (Safe delegates to MultiSendCallOnly)
+            }],
+            options: {
+                nonce: nonce
+            }
         });
 
         // Get the transaction hash
@@ -132,10 +195,27 @@ async function proposeBatchTransaction(protocolKit, apiKit, signer, transactionD
         const signedSafeTransaction = await protocolKit.signTransaction(safeTransaction);
         console.log(`✍️  Transaction signed`);
 
+        // Get the Safe address
+        const safeAddress = await protocolKit.getAddress();
+
+        // Construct the safe transaction data object explicitly
+        const safeTransactionData = {
+            to: safeTransaction.data.to,
+            value: safeTransaction.data.value,
+            data: safeTransaction.data.data,
+            operation: safeTransaction.data.operation,
+            safeTxGas: safeTransaction.data.safeTxGas,
+            baseGas: safeTransaction.data.baseGas,
+            gasPrice: safeTransaction.data.gasPrice,
+            gasToken: safeTransaction.data.gasToken,
+            refundReceiver: safeTransaction.data.refundReceiver,
+            nonce: safeTransaction.data.nonce
+        };
+
         // Propose the transaction to the Safe service
         await apiKit.proposeTransaction({
-            safeAddress: await protocolKit.getAddress(),
-            safeTransactionData: signedSafeTransaction.data,
+            safeAddress: safeAddress,
+            safeTransactionData: safeTransactionData,
             safeTxHash: safeTxHash,
             senderAddress: signer.address,
             senderSignature: signedSafeTransaction.encodedSignatures(),
@@ -196,20 +276,29 @@ async function proposeAllTransactions(directoryPath, privateKey, chainId, delayB
         }
         console.log(`✅ Verified: Signer is an owner of the Safe`);
 
-        // Propose each transaction batch
+        // Get the current nonce from the Safe
+        let currentNonce = await protocolKit.getNonce();
+        console.log(`\n🔢 Starting nonce: ${currentNonce}`);
+        console.log(`📦 Total batches to propose: ${transactionFiles.length}`);
+        console.log(`🔢 Nonces will be assigned: ${currentNonce} to ${currentNonce + transactionFiles.length - 1}`);
+
+        // Propose each transaction batch with sequential nonces
         const results = [];
         for (let i = 0; i < transactionFiles.length; i++) {
             const file = transactionFiles[i];
+            const batchNonce = currentNonce + i;
+
             console.log(`\n${'='.repeat(80)}`);
             console.log(`📄 Processing file ${i + 1}/${transactionFiles.length}: ${file.filename}`);
             console.log(`${'='.repeat(80)}`);
 
             try {
-                const txHash = await proposeBatchTransaction(protocolKit, apiKit, signer, file.data);
+                const txHash = await proposeBatchTransaction(protocolKit, apiKit, signer, file.data, batchNonce);
                 results.push({
                     filename: file.filename,
                     status: 'success',
-                    txHash: txHash
+                    txHash: txHash,
+                    nonce: batchNonce
                 });
 
                 // Add delay between batches to avoid rate limiting
@@ -222,7 +311,8 @@ async function proposeAllTransactions(directoryPath, privateKey, chainId, delayB
                 results.push({
                     filename: file.filename,
                     status: 'failed',
-                    error: error.message
+                    error: error.message,
+                    nonce: batchNonce
                 });
             }
         }
@@ -239,9 +329,11 @@ async function proposeAllTransactions(directoryPath, privateKey, chainId, delayB
         results.forEach((result, index) => {
             if (result.status === 'success') {
                 console.log(`  ${index + 1}. ✅ ${result.filename}`);
+                console.log(`     Nonce: ${result.nonce}`);
                 console.log(`     TX Hash: ${result.txHash}`);
             } else {
                 console.log(`  ${index + 1}. ❌ ${result.filename}`);
+                console.log(`     Nonce: ${result.nonce}`);
                 console.log(`     Error: ${result.error}`);
             }
         });
@@ -279,11 +371,16 @@ async function proposeSingleTransaction(filePath, privateKey, chainId) {
         }
         console.log(`✅ Verified: Signer is an owner of the Safe`);
 
+        // Get the current nonce from the Safe
+        const currentNonce = await protocolKit.getNonce();
+        console.log(`\n🔢 Current nonce: ${currentNonce}`);
+
         // Propose the transaction
-        const txHash = await proposeBatchTransaction(protocolKit, apiKit, signer, transactionData);
+        const txHash = await proposeBatchTransaction(protocolKit, apiKit, signer, transactionData, currentNonce);
 
         console.log(`\n✅ Transaction proposed successfully!`);
         console.log(`📄 File: ${filePath}`);
+        console.log(`🔢 Nonce: ${currentNonce}`);
         console.log(`🔐 TX Hash: ${txHash}`);
 
         return txHash;

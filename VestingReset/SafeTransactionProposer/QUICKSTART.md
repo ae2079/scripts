@@ -41,11 +41,12 @@ Edit your `.env` file:
 # Required
 PRIVATE_KEY=0x1234567890abcdef...
 
-# Optional overrides
-SAFE_ADDRESS=0x1234567890123456789012345678901234567890
+# Optional overrides (usually not needed)
 CHAIN_ID=137
 RPC_URL=https://polygon-rpc.com
 ```
+
+**Note:** Safe address is automatically extracted from transaction files, no need to configure it.
 
 ### Option 2: Edit CONFIG in code
 
@@ -55,14 +56,14 @@ Edit the `CONFIG` object at the top of `proposeSafeTransactions.js`:
 const CONFIG = {
     CHAIN_ID: '137',        // 137 = Polygon, 1 = Ethereum, etc.
     RPC_URL: 'https://polygon-rpc.com',
-    SAFE_ADDRESS: '0x1234567890123456789012345678901234567890'
+    MULTI_SEND_CALL_ONLY_ADDRESS: '0x9641d764fc13c8B624c04430C7356C1C7C8102e2'
 };
 ```
 
-### Option 3: Command line arguments
+### Option 3: Command line override for Chain ID
 
 ```bash
-node proposeSafeTransactions.js batch ../X23/pushPayment 0xCustomSafeAddress 137
+node proposeSafeTransactions.js batch ../X23/pushPayment 137
 ```
 
 ## ⚠️ Important Notes
@@ -101,15 +102,18 @@ VestingReset/
 ## 💡 Tips
 
 - Use **batch mode** to propose multiple transactions at once
+- **Automatic nonce management**: Each batch gets a unique, sequential nonce (no conflicts!)
 - The script includes 2-second delays between batches to avoid rate limiting
-- Check the console output for transaction hashes and links
+- Check the console output for transaction hashes, nonces, and links
 - If a transaction fails, the script continues with the next one
+- Transactions will appear in Safe UI in the correct order based on their nonces
 
 ## 🆘 Troubleshooting
 
 | Error | Solution |
 |-------|----------|
 | "Signer is not an owner" | Verify your private key belongs to a Safe owner |
+| "Delegate call is disabled" | **Fixed!** Script uses MultiSendCallOnly (0x9641d764...) - Safe delegates to it, it makes CALLs |
 | "Network error" | Check RPC_URL is correct and accessible |
 | "Rate limiting" | Wait a few minutes and try again |
 | "Transaction already proposed" | This transaction already exists in the Safe |
