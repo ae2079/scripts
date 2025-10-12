@@ -144,12 +144,12 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
 
 
 
-const projectName = 'X23';
+const projectName = 'AKARUN';
 // const paymentProcessor = "0xDE1811172756feb79a4c937246B320d36615C184"; // akarun
-const paymentRouterAddress = "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be"; // client
-const fundingPotMSAddress = "0xe077bC743b10833cC938cd5700F92316d5dA11Bf";
+const paymentRouterAddress = "0x513E116779a0E4645d262c3d78190B4cC6bB47Dd"; // client
+const fundingPotMSAddress = "0x473c36457e2c134837937f7c20aa0abaf78210c3";
 // const workflowAdminAddress = "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e";
-const abcTokenAddress = "0xc530B75465Ce3c6286e718110A7B2e2B64Bdc860";
+const abcTokenAddress = "0xA3dd6163B5742B0D8Cb7d79CB5DFE3F81F8F8fC4";
 
 const start = 1760371200;
 const cliff = 0;

@@ -46,19 +46,19 @@ Before using this tool, you need:
 ### Propose a Single Transaction File
 
 ```bash
-PRIVATE_KEY=0x... node proposeSafeTransactions.js single ../X23/pushPayment/transactions_X23_batch1_20251012_0000.json
+node proposeSafeTransactions.js single ../X23/pushPayment/transactions_X23_batch1_20251012_0000.json
 ```
 
 ### Propose All Transactions in a Directory (Batch Mode) - Recommended
 
 ```bash
-PRIVATE_KEY=0x... node proposeSafeTransactions.js batch ../X23/pushPayment
+node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ### With Custom Safe Address and Chain ID
 
 ```bash
-PRIVATE_KEY=0x... node proposeSafeTransactions.js batch ../X23/pushPayment 0xYourSafeAddress 137
+node proposeSafeTransactions.js batch ../X23/pushPayment 0xYourSafeAddress 137
 ```
 
 ### Using NPM Scripts
@@ -67,10 +67,18 @@ You can also use the provided npm scripts:
 
 ```bash
 # Propose a single transaction
-PRIVATE_KEY=0x... npm run propose:single ../X23/pushPayment/transactions_X23_batch1.json
+npm run propose:single ../X23/pushPayment/transactions_X23_batch1.json
 
 # Propose all transactions in a directory
-PRIVATE_KEY=0x... npm run propose:batch ../X23/pushPayment
+npm run propose:batch ../X23/pushPayment
+```
+
+### Alternative: Without .env file
+
+If you prefer not to use a `.env` file, you can pass the private key as an environment variable:
+
+```bash
+PRIVATE_KEY=0x... node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ## Example Workflow
@@ -89,13 +97,37 @@ cd SafeTransactionProposer
 # 3. Install dependencies (first time only)
 npm install
 
-# 4. Propose all transactions to Safe
-PRIVATE_KEY=0x... node proposeSafeTransactions.js batch ../X23/pushPayment
+# 4. Setup your private key in .env file
+cp .env.example .env
+# Edit .env and add your PRIVATE_KEY
+
+# 5. Propose all transactions to Safe
+node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ## Configuration
 
-### Default Configuration in `proposeSafeTransactions.js`
+You have three ways to configure the script:
+
+### 1. Using .env File (Recommended) 🌟
+
+Create a `.env` file (copy from `.env.example`):
+
+```bash
+# Required
+PRIVATE_KEY=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
+
+# Optional - Override defaults
+SAFE_ADDRESS=0xe077bC743b10833cC938cd5700F92316d5dA11Bf
+CHAIN_ID=137
+RPC_URL=https://polygon-rpc.com
+```
+
+**⚠️ SECURITY**: The `.env` file is in `.gitignore` and will never be committed.
+
+### 2. Edit CONFIG in Code
+
+Edit the `CONFIG` object in `proposeSafeTransactions.js`:
 
 ```javascript
 const CONFIG = {
@@ -105,26 +137,25 @@ const CONFIG = {
 };
 ```
 
-You can override these values:
-- Via command line arguments
-- By editing the CONFIG object in the script
-- Chain ID and Safe address can be passed as command line arguments
+### 3. Command Line Arguments
 
-### Required Environment Variables
-
-- `PRIVATE_KEY`: Private key of a Safe owner (required)
-  - **⚠️ SECURITY**: Never commit your private key. Always use environment variables.
-  - The private key must belong to an owner of the Safe multisig
-  - Format: `0x...` (with 0x prefix)
-
-### Optional Environment Variables
-
-You can also use a `.env` file (not included in git):
+Override Safe address and Chain ID via command line:
 
 ```bash
-PRIVATE_KEY=0xyour_private_key_here
-RPC_URL=https://your-rpc-endpoint.com
+node proposeSafeTransactions.js batch ../X23/pushPayment [SAFE_ADDRESS] [CHAIN_ID]
 ```
+
+Example:
+```bash
+node proposeSafeTransactions.js batch ../X23/pushPayment 0xCustomSafe 137
+```
+
+### Priority Order
+
+Configuration values are resolved in this order (highest to lowest priority):
+1. Command line arguments
+2. Environment variables (from `.env` file)
+3. Default CONFIG values in code
 
 ## Security Best Practices
 

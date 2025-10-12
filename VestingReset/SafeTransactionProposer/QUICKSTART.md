@@ -5,6 +5,10 @@
 ```bash
 cd SafeTransactionProposer
 npm install
+
+# Copy and configure .env file
+cp .env.example .env
+# Then edit .env and add your PRIVATE_KEY
 ```
 
 ## 📝 Basic Usage
@@ -12,18 +16,40 @@ npm install
 ### Propose All Transactions in a Folder (Most Common)
 
 ```bash
-PRIVATE_KEY=0xYourPrivateKey node proposeSafeTransactions.js batch ../X23/pushPayment
+node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ### Propose a Single Transaction File
 
 ```bash
-PRIVATE_KEY=0xYourPrivateKey node proposeSafeTransactions.js single ../X23/pushPayment/transactions_batch1.json
+node proposeSafeTransactions.js single ../X23/pushPayment/transactions_batch1.json
+```
+
+### Alternative: Using Environment Variable (without .env file)
+
+```bash
+PRIVATE_KEY=0xYourPrivateKey node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ## 🔧 Configuration
 
-Edit the `CONFIG` object at the top of `proposeSafeTransactions.js` if you need to change:
+### Option 1: Using .env file (Recommended)
+
+Edit your `.env` file:
+
+```bash
+# Required
+PRIVATE_KEY=0x1234567890abcdef...
+
+# Optional overrides
+SAFE_ADDRESS=0x1234567890123456789012345678901234567890
+CHAIN_ID=137
+RPC_URL=https://polygon-rpc.com
+```
+
+### Option 2: Edit CONFIG in code
+
+Edit the `CONFIG` object at the top of `proposeSafeTransactions.js`:
 
 ```javascript
 const CONFIG = {
@@ -33,10 +59,10 @@ const CONFIG = {
 };
 ```
 
-Or override via command line:
+### Option 3: Command line arguments
 
 ```bash
-PRIVATE_KEY=0x... node proposeSafeTransactions.js batch ../X23/pushPayment 0xYourSafeAddress 137
+node proposeSafeTransactions.js batch ../X23/pushPayment 0xCustomSafeAddress 137
 ```
 
 ## ⚠️ Important Notes
