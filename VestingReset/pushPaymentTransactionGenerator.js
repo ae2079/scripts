@@ -144,20 +144,62 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
 
 
 
-const projectName = 'AKARUN';
-// const paymentProcessor = "0xDE1811172756feb79a4c937246B320d36615C184"; // akarun
-const paymentRouterAddress = "0x513E116779a0E4645d262c3d78190B4cC6bB47Dd"; // client
-const fundingPotMSAddress = "0x473c36457e2c134837937f7c20aa0abaf78210c3";
-// const workflowAdminAddress = "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e";
-const abcTokenAddress = "0xA3dd6163B5742B0D8Cb7d79CB5DFE3F81F8F8fC4";
+// ============================================================================
+// CONFIGURATION - Update this file name as needed
+// ============================================================================
+const transactionFileName = "1.json"; // Transaction file to extract config and user data from
+
+// The transaction file contains both configuration and user data:
+// - projectName: root level
+// - fundingPotMSAddress: inputs.projectConfig.SAFE
+// - paymentRouterAddress: queries.addresses.paymentRouter
+// - abcTokenAddress: queries.addresses.issuanceToken
+// - userData: transactions.readable
+
+// Read transaction file
+console.log(`📄 Reading transaction file: ${transactionFileName}`);
+const filesData = readTransactionFile(transactionFileName);
+
+// Extract configuration from transaction file
+let projectName = filesData.projectName;
+const paymentRouterAddress = filesData.queries.addresses.paymentRouter;
+const fundingPotMSAddress = filesData.inputs.projectConfig.SAFE;
+const abcTokenAddress = filesData.queries.addresses.issuanceToken;
+
+// Clean up project name - remove trailing '_S2' or '_'
+if (projectName) {
+    const originalName = projectName;
+    projectName = projectName.replace(/_S2$/i, '').replace(/_+$/, '');
+    if (originalName !== projectName) {
+        console.log(`📝 Cleaned project name: ${originalName} → ${projectName}`);
+    }
+}
+
+// Validate extracted data
+if (!projectName || !paymentRouterAddress || !fundingPotMSAddress || !abcTokenAddress) {
+    console.error('❌ Error: Failed to extract all required configuration from transaction file');
+    console.error('Missing:', {
+        projectName: !!projectName,
+        paymentRouterAddress: !!paymentRouterAddress,
+        fundingPotMSAddress: !!fundingPotMSAddress,
+        abcTokenAddress: !!abcTokenAddress
+    });
+    process.exit(1);
+}
+
+console.log('\n✅ Project Configuration (extracted from transaction file):');
+console.log(`   Project Name: ${projectName}`);
+console.log(`   Safe Address: ${fundingPotMSAddress}`);
+console.log(`   Payment Router: ${paymentRouterAddress}`);
+console.log(`   Token Address: ${abcTokenAddress}`);
 
 const start = 1760371200;
 const cliff = 0;
 const end = 1773417600;
 
-
-const filesData = readTransactionFile("5.json");
+// Extract user data from transaction file
 const userData = getUserDataFromTransactions(filesData.transactions.readable);
+console.log(`   Users Found: ${userData.length}\n`);
 
 const addressToFilter = []
 const onlyFilteredUsers = false;

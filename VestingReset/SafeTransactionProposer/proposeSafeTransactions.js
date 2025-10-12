@@ -14,13 +14,13 @@ dotenv.config();
  * You can also override these via environment variables in .env file:
  * - PRIVATE_KEY (required)
  * - RPC_URL (optional)
- * - SAFE_ADDRESS (optional, can also be passed via command line)
  * - CHAIN_ID (optional, can also be passed via command line)
+ * 
+ * Note: SAFE_ADDRESS is automatically extracted from transaction files (meta.createdFromSafeAddress)
  */
 const CONFIG = {
     CHAIN_ID: process.env.CHAIN_ID || '137', // Polygon Mainnet
     RPC_URL: process.env.RPC_URL || 'https://polygon-rpc.com', // Or use your preferred RPC
-    SAFE_ADDRESS: process.env.SAFE_ADDRESS || '0x473C36457e2c134837937F7C20aA0aBaf78210c3', // Your Safe address
 };
 
 /**
@@ -32,6 +32,13 @@ function readTransactionFile(filePath) {
         const transactionData = JSON.parse(data);
         console.log(`✅ Successfully read transaction file: ${filePath}`);
         console.log(`📊 Found ${transactionData.transactions.length} transactions`);
+
+        // Extract Safe address from transaction file
+        const safeAddress = transactionData.meta && transactionData.meta.createdFromSafeAddress;
+        if (safeAddress) {
+            console.log(`🔒 Safe Address (from file): ${safeAddress}`);
+        }
+
         return transactionData;
     } catch (error) {
         console.error(`❌ Error reading file ${filePath}:`, error.message);
@@ -148,7 +155,7 @@ async function proposeBatchTransaction(protocolKit, apiKit, signer, transactionD
 /**
  * Proposes all transactions from files in a directory
  */
-async function proposeAllTransactions(directoryPath, privateKey, safeAddress, chainId, delayBetweenBatches = 2000) {
+async function proposeAllTransactions(directoryPath, privateKey, chainId, delayBetweenBatches = 2000) {
     try {
         // Read all transaction files
         const transactionFiles = readAllTransactionFiles(directoryPath);
@@ -157,6 +164,27 @@ async function proposeAllTransactions(directoryPath, privateKey, safeAddress, ch
             console.log('⚠️  No transaction files found to propose');
             return;
         }
+
+        // Extract Safe address from the first transaction file
+        const safeAddress = transactionFiles[0].data.meta && transactionFiles[0].data.meta.createdFromSafeAddress;
+        if (!safeAddress) {
+            throw new Error('❌ Safe address not found in transaction file. Please ensure the transaction file has meta.createdFromSafeAddress');
+        }
+
+        // Verify all transaction files use the same Safe address
+        const inconsistentFiles = transactionFiles.filter(f => {
+            const fSafeAddress = f.data.meta && f.data.meta.createdFromSafeAddress;
+            return fSafeAddress && fSafeAddress.toLowerCase() !== safeAddress.toLowerCase();
+        });
+        if (inconsistentFiles.length > 0) {
+            console.warn(`⚠️  Warning: ${inconsistentFiles.length} file(s) have different Safe addresses`);
+            inconsistentFiles.forEach(f => {
+                const addr = f.data.meta && f.data.meta.createdFromSafeAddress;
+                console.warn(`   - ${f.filename}: ${addr}`);
+            });
+        }
+
+        console.log(`\n🔐 Using Safe Address: ${safeAddress}`);
 
         // Initialize Safe SDK
         const { protocolKit, apiKit, signer } = await initializeSafe(privateKey, safeAddress, chainId);
@@ -228,10 +256,18 @@ async function proposeAllTransactions(directoryPath, privateKey, safeAddress, ch
 /**
  * Proposes a single transaction file
  */
-async function proposeSingleTransaction(filePath, privateKey, safeAddress, chainId) {
+async function proposeSingleTransaction(filePath, privateKey, chainId) {
     try {
         // Read the transaction file
         const transactionData = readTransactionFile(filePath);
+
+        // Extract Safe address from transaction file
+        const safeAddress = transactionData.meta && transactionData.meta.createdFromSafeAddress;
+        if (!safeAddress) {
+            throw new Error('❌ Safe address not found in transaction file. Please ensure the transaction file has meta.createdFromSafeAddress');
+        }
+
+        console.log(`\n🔐 Using Safe Address: ${safeAddress}`);
 
         // Initialize Safe SDK
         const { protocolKit, apiKit, signer } = await initializeSafe(privateKey, safeAddress, chainId);
@@ -279,7 +315,8 @@ async function main() {
         console.log('\n📝 Examples:');
         console.log('   node proposeSafeTransactions.js single ../X23/pushPayment/transactions_batch1.json');
         console.log('   node proposeSafeTransactions.js batch ../X23/pushPayment');
-        console.log('   node proposeSafeTransactions.js batch ../X23/pushPayment 0xCustomSafeAddress 137');
+        console.log('   node proposeSafeTransactions.js batch ../X23/pushPayment 137');
+        console.log('\n📌 Note: Safe address is automatically read from transaction files');
         process.exit(1);
     }
 
@@ -288,28 +325,30 @@ async function main() {
     if (args.length < 2) {
         console.error('❌ Error: Insufficient arguments');
         console.log('\n💡 Usage:');
-        console.log('   node proposeSafeTransactions.js <mode> <path>');
+        console.log('   node proposeSafeTransactions.js <mode> <path> [chainId]');
         console.log('\nModes:');
         console.log('   single <file_path>  - Propose a single transaction file');
         console.log('   batch <directory>   - Propose all transaction files in a directory');
+        console.log('\nOptional:');
+        console.log('   chainId - Override chain ID (default: 137 for Polygon)');
+        console.log('\n📌 Note: Safe address is automatically read from transaction files');
         process.exit(1);
     }
 
     const mode = args[0];
     const targetPath = args[1];
 
-    // Optional: Override Safe address from command line
-    const safeAddress = args[2] || CONFIG.SAFE_ADDRESS;
-    const chainId = args[3] || CONFIG.CHAIN_ID;
+    // Optional: Override chain ID from command line
+    const chainId = args[2] || CONFIG.CHAIN_ID;
 
     console.log('\n🚀 Starting Safe Transaction Proposer');
     console.log(`${'='.repeat(80)}\n`);
 
     try {
         if (mode === 'single') {
-            await proposeSingleTransaction(targetPath, privateKey, safeAddress, chainId);
+            await proposeSingleTransaction(targetPath, privateKey, chainId);
         } else if (mode === 'batch') {
-            await proposeAllTransactions(targetPath, privateKey, safeAddress, chainId);
+            await proposeAllTransactions(targetPath, privateKey, chainId);
         } else {
             console.error(`❌ Error: Invalid mode "${mode}". Use "single" or "batch"`);
             process.exit(1);
