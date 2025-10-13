@@ -108,7 +108,8 @@ function generateTransactionJson(safe, projectName, paymentProcessor, client, us
 const projectName = 'X23';
 const paymentProcessor = "0xD6F574062E948d6B7F07c693f1b4240aFeA41657";
 const paymentRouterAddress = "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be";
-const fundingPotMSAddress = "0xe077bC743b10833cC938cd5700F92316d5dA11Bf";
+
+const workflowAdminMultisig = "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e";
 
 // test
 const userAddress = "0x313a58f11d8cf6f1667b7c8d615bd93b8c3f49cb";
@@ -130,29 +131,29 @@ const ea3Users = getUserAddressesFromTransactions(filesDataEA3.transactions.read
 const filesDataS2 = readTransactionFile("5.json");
 const S2Users = getUserAddressesFromTransactions(filesDataS2.transactions.readable);
 
-const teamsVestings = [
-    "0x0D3edA53332b9fDf4d4e9FB4C1C940A80B16eD9D",
-    "0x01b9F17e97dFb2e25581690e048d4fF8d0b788f3",
-    "0xcE3848cDf3304CB71ef1615700EEe09E030559F9",
-    "0x346e969567224490C54B8C8DB783b8D22ADFD5d5",
-    "0x1a7ba55c069331a5079DF14CC8C2351589A0aCFA",
-]
+// const teamsVestings = [
+//     "0x0D3edA53332b9fDf4d4e9FB4C1C940A80B16eD9D",
+//     "0x01b9F17e97dFb2e25581690e048d4fF8d0b788f3",
+//     "0xcE3848cDf3304CB71ef1615700EEe09E030559F9",
+//     "0x346e969567224490C54B8C8DB783b8D22ADFD5d5",
+//     "0x1a7ba55c069331a5079DF14CC8C2351589A0aCFA",
+// ]
 
 // Union all EA users and remove QACC users
-const allEAUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users, ...S2Users, ...teamsVestings])];
-const totalUsers = [...new Set([...allEAUsers, ...qaccUsers])];
-const finalUsers = allEAUsers.filter(user => !qaccUsers.includes(user));
+const allEAUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users])];
+const totalUsers = [...new Set([...allEAUsers, ...qaccUsers, ...S2Users])];
 
-console.log(`Total EA users + Season 2 + teams vestings: ${allEAUsers.length}`);
-console.log(`QACC users to remove: ${qaccUsers.length}`);
+console.log(`Total EA users: ${allEAUsers.length}`);
+console.log(`Qacc S1 users: ${qaccUsers.length}`);
+console.log(`S2 users: ${S2Users.length}`);
 console.log(`Total users: ${totalUsers.length}`);
-console.log(`Final users after removing QACC: ${finalUsers.length}`);
 
 // generateTransactionJson(fundingPotMSAddress, projectName, paymentProcessor, paymentRouterAddress, qaccUsers);
 
-const s2UsersWithoutQacc = S2Users.filter(user => !qaccUsers.includes(user));
+// const manualUsers = [
+//     "0x313a58f11d8cf6f1667b7c8d615bd93b8c3f49cb",
+// ]
 
-console.log(`S2 users without QACC: ${s2UsersWithoutQacc.length}`);
-generateTransactionJson(fundingPotMSAddress, projectName, paymentProcessor, paymentRouterAddress, s2UsersWithoutQacc);
+generateTransactionJson(workflowAdminMultisig, projectName, paymentProcessor, paymentRouterAddress, totalUsers);
 
 console.log("Done!");
