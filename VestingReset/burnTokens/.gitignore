@@ -1,0 +1,10 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Output folders (keep structure but not actual transaction files)
+X23/
+
+# System files
+.DS_Store
+

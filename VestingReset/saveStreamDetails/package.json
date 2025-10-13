@@ -5,7 +5,8 @@
     "type": "module",
     "main": "fetchUserStreamData.js",
     "scripts": {
-        "fetch": "node fetchUserStreamData.js"
+        "fetch": "node fetchUserStreamData.js",
+        "check": "node checkActiveStreams.js"
     },
     "dependencies": {
         "ethers": "^6.9.0"

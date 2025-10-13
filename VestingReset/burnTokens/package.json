@@ -1,0 +1,15 @@
+{
+    "name": "generate-remove-payments",
+    "version": "1.0.0",
+    "description": "Generate removal transactions for payment streams (filtered by active streams only)",
+    "type": "module",
+    "main": "generateRemovePaymentsTransactions.js",
+    "scripts": {
+        "generate": "node generateRemovePaymentsTransactions.js"
+    },
+    "dependencies": {
+        "ethers": "^6.9.0"
+    },
+    "author": "",
+    "license": "MIT"
+}
