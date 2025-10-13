@@ -203,9 +203,38 @@ console.log(`   Safe Address: ${fundingPotMSAddress}`);
 console.log(`   Payment Router: ${paymentRouterAddress}`);
 console.log(`   Token Address: ${abcTokenAddress}`);
 
-const start = 1760371200;
+// Extract timing data from the first transaction
+let originalStart, originalCliff, originalEnd;
+if (filesData.transactions.readable && filesData.transactions.readable.length > 0) {
+    const firstTransaction = filesData.transactions.readable[0];
+    if (firstTransaction && firstTransaction.length > 0) {
+        const firstTx = firstTransaction.find(tx =>
+            tx.functionSignature === "pushPayment(address,address,uint256,uint256,uint256,uint256)"
+        );
+        if (firstTx && firstTx.inputValues && firstTx.inputValues.length >= 6) {
+            originalStart = parseInt(firstTx.inputValues[3]);
+            originalCliff = parseInt(firstTx.inputValues[4]);
+            originalEnd = parseInt(firstTx.inputValues[5]);
+        }
+    }
+}
+
+if (!originalStart || !originalEnd) {
+    console.error('❌ Error: Failed to extract timing data from transaction file');
+    process.exit(1);
+}
+
+// Calculate new timing: start = originalStart + originalCliff, cliff = 0, end = originalEnd
+const start = originalStart + originalCliff;
 const cliff = 0;
-const end = 1773417600;
+const end = originalEnd;
+
+console.log(`   Original Start: ${originalStart} (${new Date(originalStart * 1000).toISOString()})`);
+console.log(`   Original Cliff: ${originalCliff} seconds (${Math.floor(originalCliff / 86400)} days)`);
+console.log(`   Original End: ${originalEnd} (${new Date(originalEnd * 1000).toISOString()})`);
+console.log(`   → New Start: ${start} (${new Date(start * 1000).toISOString()})`);
+console.log(`   → New Cliff: ${cliff}`);
+console.log(`   → New End: ${end} (${new Date(end * 1000).toISOString()})`);
 
 // Extract user data from transaction file
 const userData = getUserDataFromTransactions(filesData.transactions.readable);
