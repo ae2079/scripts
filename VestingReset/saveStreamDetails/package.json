@@ -1,0 +1,15 @@
+{
+    "name": "save-stream-details",
+    "version": "1.0.0",
+    "description": "Fetch and save user stream data from blockchain",
+    "type": "module",
+    "main": "fetchUserStreamData.js",
+    "scripts": {
+        "fetch": "node fetchUserStreamData.js"
+    },
+    "dependencies": {
+        "ethers": "^6.9.0"
+    },
+    "author": "",
+    "license": "MIT"
+}

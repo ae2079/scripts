@@ -1,0 +1,25 @@
+{
+    "name": "push-payment-from-streams",
+    "version": "1.0.0",
+    "description": "Generate pushPayment transactions from existing stream data with immediate + weekly vestings",
+    "type": "module",
+    "main": "generatePushPaymentFromStreams.js",
+    "scripts": {
+        "generate": "node generatePushPaymentFromStreams.js",
+        "start": "node generatePushPaymentFromStreams.js"
+    },
+    "keywords": [
+        "vesting",
+        "streams",
+        "safe",
+        "gnosis-safe",
+        "ethereum",
+        "polygon",
+        "pushPayment"
+    ],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "ethers": "^6.11.1"
+    }
+}
