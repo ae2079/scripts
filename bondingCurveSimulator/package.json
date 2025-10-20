@@ -24,9 +24,9 @@
     "author": "",
     "license": "MIT",
     "dependencies": {
+        "dotenv": "^17.2.3",
         "ethers": "^6.0.0"
     },
-    "devDependencies": {},
     "repository": {
         "type": "git",
         "url": ""

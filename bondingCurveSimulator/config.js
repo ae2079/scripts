@@ -4,15 +4,19 @@
  * Add your bonding curve contracts here for easy switching
  */
 
+// Load environment variables from .env file
+require('dotenv').config();
+
 module.exports = {
     // RPC endpoints
+    // Priority: Environment variables > Default values
     rpc: {
-        polygon: "https://polygon-rpc.com",
-        polygonBackup: "https://rpc-mainnet.matic.network",
-        ethereum: "https://eth.llamarpc.com",
-        arbitrum: "https://arb1.arbitrum.io/rpc",
-        optimism: "https://mainnet.optimism.io",
-        base: "https://mainnet.base.org",
+        polygon: process.env.POLYGON_RPC_URL || process.env.RPC_URL || "https://polygon-rpc.com",
+        polygonBackup: process.env.POLYGON_RPC_URL_BACKUP || "https://rpc-mainnet.matic.network",
+        ethereum: process.env.ETHEREUM_RPC_URL || "https://eth.llamarpc.com",
+        arbitrum: process.env.ARBITRUM_RPC_URL || "https://arb1.arbitrum.io/rpc",
+        optimism: process.env.OPTIMISM_RPC_URL || "https://mainnet.optimism.io",
+        base: process.env.BASE_RPC_URL || "https://mainnet.base.org",
     },
 
     // Your bonding curve contracts

@@ -14,6 +14,140 @@ const { accurateCheck } = require('./check');
 const tokensInfoPath = path.join(__dirname, '../bondingCurveSimulator/tokensInfo.json');
 const tokensInfo = JSON.parse(fs.readFileSync(tokensInfoPath, 'utf8'));
 
+// Retry and circuit breaker configuration
+const RETRY_CONFIG = {
+    maxRetries: 3,
+    baseDelay: 5000, // 5 seconds base delay
+    maxDelay: 300000, // 5 minutes max delay
+    backoffMultiplier: 2, // Exponential backoff
+};
+
+const CIRCUIT_BREAKER = {
+    failureThreshold: 3, // Open circuit after 3 consecutive failures
+    recoveryTime: 120000, // 2 minutes before trying again
+    failureCount: 0,
+    state: 'CLOSED', // CLOSED, OPEN, HALF_OPEN
+    lastFailureTime: null,
+};
+
+/**
+ * Check if error is a rate limit error
+ */
+function isRateLimitError(error) {
+    const message = error.message ? error.message.toLowerCase() : '';
+    return message.includes('rate limit') ||
+        message.includes('too many requests') ||
+        message.includes('429') ||
+        error.code === 'RATE_LIMIT_EXCEEDED';
+}
+
+/**
+ * Check circuit breaker state
+ */
+function checkCircuitBreaker() {
+    if (CIRCUIT_BREAKER.state === 'OPEN') {
+        const timeSinceFailure = Date.now() - CIRCUIT_BREAKER.lastFailureTime;
+        if (timeSinceFailure >= CIRCUIT_BREAKER.recoveryTime) {
+            console.log(`\n🔄 Circuit breaker: Moving to HALF_OPEN state`);
+            CIRCUIT_BREAKER.state = 'HALF_OPEN';
+            CIRCUIT_BREAKER.failureCount = 0;
+        } else {
+            const waitTime = Math.ceil((CIRCUIT_BREAKER.recoveryTime - timeSinceFailure) / 1000);
+            throw new Error(`Circuit breaker OPEN. Wait ${waitTime}s before retry.`);
+        }
+    }
+}
+
+/**
+ * Record success in circuit breaker
+ */
+function recordSuccess() {
+    if (CIRCUIT_BREAKER.state === 'HALF_OPEN') {
+        console.log(`✓ Circuit breaker: Recovered, moving to CLOSED state`);
+        CIRCUIT_BREAKER.state = 'CLOSED';
+    }
+    CIRCUIT_BREAKER.failureCount = 0;
+}
+
+/**
+ * Record failure in circuit breaker
+ */
+function recordFailure() {
+    CIRCUIT_BREAKER.failureCount++;
+    CIRCUIT_BREAKER.lastFailureTime = Date.now();
+
+    if (CIRCUIT_BREAKER.failureCount >= CIRCUIT_BREAKER.failureThreshold) {
+        console.log(`\n⚠️  Circuit breaker OPENED after ${CIRCUIT_BREAKER.failureCount} failures`);
+        console.log(`   Waiting ${CIRCUIT_BREAKER.recoveryTime / 1000}s before retry...`);
+        CIRCUIT_BREAKER.state = 'OPEN';
+    }
+}
+
+/**
+ * Analyze project with retry logic
+ */
+async function analyzeProjectWithRetry(name, data, retryCount = 0) {
+    try {
+        // Check circuit breaker
+        checkCircuitBreaker();
+
+        // Attempt analysis
+        const result = await accurateCheck(data.bondingCurve, 7500000, null, true, name);
+
+        // Success - record and return
+        recordSuccess();
+
+        return {
+            name,
+            success: true,
+            contract: data.bondingCurve,
+            currentSupply: result.currentState ? result.currentState.supply : null,
+            targetSupply: result.targetAnalysis ? result.targetAnalysis.targetSupply : null,
+            tokensToBuy: result.targetAnalysis ? result.targetAnalysis.tokensNeeded : null,
+            wpolCost: result.targetAnalysis ? result.targetAnalysis.cost ? result.targetAnalysis.cost.wpol : null : null,
+            usdCost: result.targetAnalysis ? result.targetAnalysis.cost ? result.targetAnalysis.cost.usd : null : null,
+            currentBuyPrice: result.currentPrices ? result.currentPrices.buy ? result.currentPrices.buy.wpol : null : null,
+            currentSellPrice: result.currentPrices ? result.currentPrices.sell ? result.currentPrices.sell.wpol : null : null,
+            targetBuyPrice: result.targetAnalysis ? result.targetAnalysis.pricesAtTarget ? result.targetAnalysis.pricesAtTarget.buy ? result.targetAnalysis.pricesAtTarget.buy.wpol : null : null : null,
+            targetStaticPrice: result.targetAnalysis ? result.targetAnalysis.pricesAtTarget ? result.targetAnalysis.pricesAtTarget.static ? result.targetAnalysis.pricesAtTarget.static.wpol : null : null : null,
+            targetSellPrice: result.targetAnalysis ? result.targetAnalysis.pricesAtTarget ? result.targetAnalysis.pricesAtTarget.sell ? result.targetAnalysis.pricesAtTarget.sell.wpol : null : null : null,
+            averagePrice: result.targetAnalysis ? result.targetAnalysis.averagePrice ? result.targetAnalysis.averagePrice.wpol : null : null,
+            polPrice: result.polPrice,
+        };
+
+    } catch (error) {
+        const isRateLimit = isRateLimitError(error);
+
+        // If rate limit error and retries available, retry with backoff
+        if (isRateLimit && retryCount < RETRY_CONFIG.maxRetries) {
+            recordFailure();
+
+            const delay = Math.min(
+                RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffMultiplier, retryCount),
+                RETRY_CONFIG.maxDelay
+            );
+
+            console.log(`\n⚠️  Rate limit hit. Retry ${retryCount + 1}/${RETRY_CONFIG.maxRetries} in ${delay / 1000}s...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+
+            return analyzeProjectWithRetry(name, data, retryCount + 1);
+        }
+
+        // Max retries exceeded or non-rate-limit error
+        if (isRateLimit) {
+            recordFailure();
+        }
+
+        console.error(`❌ ${name} failed:`, error.message);
+        return {
+            name,
+            success: false,
+            error: error.message,
+            retries: retryCount,
+        };
+    }
+}
+
 async function analyzeAllProjects() {
     const projects = Object.entries(tokensInfo.projects);
     const results = [];
@@ -21,6 +155,8 @@ async function analyzeAllProjects() {
     console.log('\n🔄 Analyzing All Projects');
     console.log('═'.repeat(70));
     console.log(`Total projects: ${projects.length}`);
+    console.log(`Retry config: Max ${RETRY_CONFIG.maxRetries} retries with exponential backoff`);
+    console.log(`Circuit breaker: Opens after ${CIRCUIT_BREAKER.failureThreshold} consecutive failures`);
     console.log('═'.repeat(70));
 
     for (let i = 0; i < projects.length; i++) {
@@ -29,41 +165,25 @@ async function analyzeAllProjects() {
         console.log(`\n[${i + 1}/${projects.length}] Analyzing ${name}...`);
         console.log('─'.repeat(70));
 
-        try {
-            const result = await accurateCheck(data.bondingCurve, 7500000, null, true, name);
+        const result = await analyzeProjectWithRetry(name, data);
+        results.push(result);
 
-            // Add delay to avoid rate limiting (wait 3 seconds between projects)
+        if (result.success) {
+            console.log(`✅ ${name} complete`);
+
+            // Add delay to avoid rate limiting (wait 10 seconds between projects)
             if (i < projects.length - 1) {
                 console.log(`⏳ Waiting 3s to avoid rate limits...`);
                 await new Promise(resolve => setTimeout(resolve, 3000));
             }
+        } else {
+            console.log(`❌ ${name} failed after ${result.retries || 0} retries`);
 
-            results.push({
-                name,
-                success: true,
-                contract: data.bondingCurve,
-                currentSupply: result.currentState ? result.currentState.supply : null,
-                targetSupply: result.targetAnalysis ? result.targetAnalysis.targetSupply : null,
-                tokensToBuy: result.targetAnalysis ? result.targetAnalysis.tokensNeeded : null,
-                wpolCost: result.targetAnalysis ? result.targetAnalysis.cost ? result.targetAnalysis.cost.wpol : null : null,
-                usdCost: result.targetAnalysis ? result.targetAnalysis.cost ? result.targetAnalysis.cost.usd : null : null,
-                currentBuyPrice: result.currentPrices ? result.currentPrices.buy ? result.currentPrices.buy.wpol : null : null,
-                currentSellPrice: result.currentPrices ? result.currentPrices.sell ? result.currentPrices.sell.wpol : null : null,
-                targetBuyPrice: result.targetAnalysis ? result.targetAnalysis.pricesAtTarget ? result.targetAnalysis.pricesAtTarget.buy ? result.targetAnalysis.pricesAtTarget.buy.wpol : null : null : null,
-                targetStaticPrice: result.targetAnalysis ? result.targetAnalysis.pricesAtTarget ? result.targetAnalysis.pricesAtTarget.static ? result.targetAnalysis.pricesAtTarget.static.wpol : null : null : null,
-                targetSellPrice: result.targetAnalysis ? result.targetAnalysis.pricesAtTarget ? result.targetAnalysis.pricesAtTarget.sell ? result.targetAnalysis.pricesAtTarget.sell.wpol : null : null : null,
-                averagePrice: result.targetAnalysis ? result.targetAnalysis.averagePrice ? result.targetAnalysis.averagePrice.wpol : null : null,
-                polPrice: result.polPrice,
-            });
-
-            console.log(`✅ ${name} complete`);
-        } catch (error) {
-            console.error(`❌ ${name} failed:`, error.message);
-            results.push({
-                name,
-                success: false,
-                error: error.message,
-            });
+            // If circuit breaker is open, wait recovery time
+            if (CIRCUIT_BREAKER.state === 'OPEN') {
+                console.log(`⏳ Circuit breaker open, waiting ${CIRCUIT_BREAKER.recoveryTime / 1000}s...`);
+                await new Promise(resolve => setTimeout(resolve, CIRCUIT_BREAKER.recoveryTime));
+            }
         }
     }
 

@@ -25,23 +25,62 @@ The buy price at target is 54% higher than the average due to the exponential cu
 ## Quick Start
 
 ```bash
-# Install
+# 1. Install dependencies
 npm install
 
-# Analyze ALL projects at once (generates 24 reports!)
-npm run all
+# 2. Set up your RPC endpoint (RECOMMENDED)
+cp .env.example .env
+# Edit .env and add your RPC URL (see Setup section below)
 
-# Check by project name
-node checkProject.js AKARUN 7500000
-node checkProject.js list  # Show all 12 projects
+# 3. Run analysis
+npm run all      # Analyze all 12 projects
+npm run project AKARUN 7500000  # Single project
+npm run price    # Check POL price
+```
 
-# Or check by contract address
-node check.js 0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56 7500000
+## Setup (Recommended for Production)
 
-# npm shortcuts
-npm run all      # Batch analyze all projects
-npm run project AKARUN 7500000
-npm run price
+### Get a Free RPC Endpoint
+
+Using a paid/dedicated RPC endpoint prevents rate limiting:
+
+1. **Alchemy** (Recommended): https://www.alchemy.com/
+   - 300M compute units/month free
+   - Best reliability
+
+2. **Infura**: https://infura.io/
+   - 100k requests/day free
+   - Good for development
+
+3. **QuickNode**: https://www.quicknode.com/
+   - Credits-based free tier
+   - High performance
+
+### Configure Environment Variables
+
+```bash
+# Copy example file
+cp .env.example .env
+
+# Edit .env and add your RPC URL
+nano .env  # or use your preferred editor
+```
+
+**Example `.env` file:**
+```env
+# Alchemy
+POLYGON_RPC_URL=https://polygon-mainnet.g.alchemy.com/v2/YOUR_API_KEY
+
+# Or Infura
+POLYGON_RPC_URL=https://polygon-mainnet.infura.io/v3/YOUR_API_KEY
+```
+
+### Without RPC Setup
+
+The script will use free public RPC, but may hit rate limits:
+```bash
+npm install
+npm run all  # May need retries, but will complete eventually
 ```
 
 ## Tools
@@ -54,6 +93,12 @@ node analyzeAll.js
 # or
 npm run all
 ```
+
+**Features:**
+- ✓ **Automatic Retry**: Retries up to 3 times with exponential backoff (5s, 10s, 20s)
+- ✓ **Circuit Breaker**: Opens after 3 consecutive failures, waits 2 minutes before retrying
+- ✓ **Rate Limit Handling**: Detects and handles RPC rate limits automatically
+- ✓ **10s Delay**: Between projects to avoid hitting rate limits
 
 **Output:**
 - 12 JSON reports (machine-readable, per project)
