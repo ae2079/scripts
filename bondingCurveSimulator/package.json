@@ -1,0 +1,36 @@
+{
+    "name": "bonding-curve-simulator",
+    "version": "1.0.0",
+    "description": "Analyze Bancor-style bonding curves with proper POL/WPOL support",
+    "main": "check.js",
+    "scripts": {
+        "start": "node check.js",
+        "check": "node check.js",
+        "project": "node checkProject.js",
+        "price": "node getPrice.js",
+        "token": "node getToken.js",
+        "compare": "node compare.js",
+        "export": "node export.js"
+    },
+    "keywords": [
+        "bonding-curve",
+        "bancor",
+        "defi",
+        "polygon",
+        "ethereum",
+        "amm"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "ethers": "^6.0.0"
+    },
+    "devDependencies": {},
+    "repository": {
+        "type": "git",
+        "url": ""
+    },
+    "engines": {
+        "node": ">=16.0.0"
+    }
+}

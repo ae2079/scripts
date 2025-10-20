@@ -1,0 +1,24 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Output files
+*.csv
+bonding_curve_*.json
+bonding_curve_*.md
+reports/*.json
+reports/*.md
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# excludes
+!tokensInfo.json

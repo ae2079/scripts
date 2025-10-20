@@ -1,0 +1,160 @@
+{
+    "projects": {
+        "AKARUN": {
+            "projectName": "AKARUN",
+            "orchestrator": "0x097Fea9749186998A4D0835E101eF786484528b8",
+            "bondingCurve": "0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56",
+            "authorizer": "0x639967DC1Cd782fa593bCE56775022b7704913E0",
+            "paymentProcessor": "0xDE1811172756feb79a4c937246B320d36615C184",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0x6941344942418FE8B58C98d24C8212DebE599935",
+            "issuanceToken": "0xA3dd6163B5742B0D8Cb7d79CB5DFE3F81F8F8fC4",
+            "paymentRouter": "0x9858b8FeE34F27959e3CDFAf022a5D0844eaeA65"
+        },
+        "ANCIENT_BEAST": {
+            "projectName": "ANCIENT_BEAST",
+            "orchestrator": "0x8b17B8B5E09db4D0bB392F948eCe3236324a0e6b",
+            "bondingCurve": "0x5B34dE32e40842e2e1D0135f0F52C467Ad8b2baB",
+            "authorizer": "0x17759Cc0206d0AD2956CC9495ff20Fdffcc3AE11",
+            "paymentProcessor": "0xac3dCB8Bb2Db59DF26a28b9fb01c067d92De542e",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0xF13e2BC8Bd790389E10937B5F02229dBb133f289",
+            "issuanceToken": "0x4191F84f66e0B7CC10370Ff47a0E2168E35b9Bdf",
+            "paymentRouter": "0x1e4350605E143E58F0C786A76FA8f70257B3D20e"
+        },
+        "CITIZEN_WALLET": {
+            "projectName": "CITIZEN_WALLET",
+            "orchestrator": "0x72f38B35D961A893a80726b9dfe17849a19FD085",
+            "bondingCurve": "0xE1B18FE51289627C22944aC0A8A22b605Fcc21DA",
+            "authorizer": "0xC2d8B63b51962097DE0d174d893b826DE5D11DdA",
+            "paymentProcessor": "0x2559C4e77131313BBBeCfA99AF51cDb4B7e9cb8A",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0x0c2350F5A6F1FFC436524FAd2FAfA5dFB551f15c",
+            "issuanceToken": "0x0D9B0790E97e3426C161580dF4Ee853E4A7C4607",
+            "paymentRouter": "0x0DDd250bfb440e6deF3157eE29747e8ac29153aD"
+        },
+        "GRIDLOCK_SOCIAL_RECOVERY_WALLET": {
+            "projectName": "GRIDLOCK_SOCIAL_RECOVERY_WALLET",
+            "orchestrator": "0x301f32d631b16ca2bd9ce68afea623f8abf1947f",
+            "bondingCurve": "0xC72666Dd3D30e150738CcF41aa474CcD0af4D4f9",
+            "authorizer": "0x522A842E528de56a8E462248904aF64f4A65CF1b",
+            "paymentProcessor": "0x1A1bD3E1225A9cda8ceD804cc73fC0B0116be0Ce",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0xc69D04477eC84F6E478e2d7678f53Fc16541922B",
+            "issuanceToken": "0x69CE536f95a84E1eF51Ed0132C514c7CE012E49b",
+            "paymentRouter": "0x9E17eFea75A3a33fB235B079D82c83458C14369C"
+        },
+        "HOW_TO_DAO": {
+            "projectName": "HOW_TO_DAO",
+            "orchestrator": "0xbedd76a369d53cf149c3196e9f6bec127f0bdc3e",
+            "bondingCurve": "0x1C98d67Bb5326C645bfc20ae94F35B6269859E03",
+            "authorizer": "0x92555B9b7Fe7A91157fb87cf0F243CDCC78Aab3F",
+            "paymentProcessor": "0x73A829eA565eAaB17d285B827b218f739ca446b3",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0xeDB7271fB21Ca037c1bF287647F4C9B639fe2dd9",
+            "issuanceToken": "0x6Fc91FBE42f72941486c98D11724B14Fb8d18b36",
+            "paymentRouter": "0x79c744e6db81dd83E83271cDB53578318F6c1D65"
+        },
+        "MELODEX": {
+            "projectName": "MELODEX",
+            "orchestrator": "0x8d38fC1Cb76eb3AC349d4c212599686Cb0771AF1",
+            "bondingCurve": "0xa2a1efb352166d6B38e2F1C24A913390a1367435",
+            "authorizer": "0x982D0A9750CaFF48335b601d4cCfc67D59678F94",
+            "paymentProcessor": "0x3bC760AEdA9E3e510188aE3CEEDc92f876aD86d4",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0x4b91a94a6Fd6004Df100415D9D66FE3eD377F163",
+            "issuanceToken": "0x5FDAF637Aed59B2e6d384d9e84D8ac5cF03c6697",
+            "paymentRouter": "0xABfaeb84364c419b19A9241434a997c88731C6fa"
+        },
+        "PRISMO_TECHNOLOGY": {
+            "projectName": "PRISMO_TECHNOLOGY",
+            "orchestrator": "0xa2E1553d0257ae5a4a4d552FeAc3CA6Ec4754559",
+            "bondingCurve": "0xaBAb922f048aa22515c561c5c71f3ABD05F0B938",
+            "authorizer": "0x872baE78a1dE530B5701Cd89423F55f49074b86b",
+            "paymentProcessor": "0xFfBCbfeBD4eee9b546097dE19b966CA0fd01D66E",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0xC4A7708Fa636bc21364d32B02Cff9164016d9De1",
+            "issuanceToken": "0x0b7a46E1af45E1EaadEeD34B55b6FC00A85c7c68",
+            "paymentRouter": "0x96b6aA42777D0fDDE8F8e45f35129D1D11CdA981"
+        },
+        "THE_GRAND_TIMELINE": {
+            "projectName": "THE_GRAND_TIMELINE",
+            "orchestrator": "0x26424d7a425b7607B53705D4e21fa22Fb7F69166",
+            "bondingCurve": "0x9d2720d1Bb13F8F5aC51fc32c0a9742A3DD101Be",
+            "authorizer": "0x3d9Bf3d62BF31E054b9650BABdE45f85552b224c",
+            "paymentProcessor": "0x6AC465a3Acc6b89351e5Db0A1d9D7FA856556EaB",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0x793Aa2517656F1dFd528F41000EFE9d4175C917E",
+            "issuanceToken": "0xfAFB870F1918827fe57Ca4b891124606EaA7e6bd",
+            "paymentRouter": "0x480f463b0831990b1929fB401f21E55B21E985cD"
+        },
+        "TO_DA_MOON": {
+            "projectName": "TO_DA_MOON",
+            "orchestrator": "0x37c90d88f6d9256f81e6c3d3695c913abec33360",
+            "bondingCurve": "0x2B3F6dCed3C06A31AF2b8fb5DA8b48496198f3e2",
+            "authorizer": "0x23699fc39685C56A1E11623f344ff6EF0fcbe0fc",
+            "paymentProcessor": "0x13FC72398a083936146b6dBAd2e069Dd55c7AD22",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0x16418Dc99bC44C89806c2a072B96963f4CD88218",
+            "issuanceToken": "0x878b6bF76F7BA67D0c4Da616eAc1933f9b133C1c",
+            "paymentRouter": "0xAbeFd091Abfb87528151e48973829c407FFA1333"
+        },
+        "WEB3_PACKS": {
+            "projectName": "WEB3_PACKS",
+            "orchestrator": "0xe2111fae7d9e812b4d797aaf4858ad2d17f68f8c",
+            "bondingCurve": "0x8675459B17d1d93eC0C41c783bDA16fF9b9b589B",
+            "authorizer": "0xd8e984038878d78620AD6cd3AD6b30549e724487",
+            "paymentProcessor": "0x498486c19396c90072D258AeC1E4ab07f74BD337",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0x355cD1d64A7ba68e2fBe249999ebb9CDCc24101e",
+            "issuanceToken": "0x4Fb9B94BD8bBbD684a7D5A5544Bc7A07188E5617",
+            "paymentRouter": "0xD1959e8a3D0C2cB2768543feD5bdD27D19b6c73e"
+        },
+        "X23AI": {
+            "projectName": "X23AI",
+            "orchestrator": "0x81D2492bDb00C112C59Bf171D9c1e3350454Edc0",
+            "bondingCurve": "0x4b2502ad254855AC83990998695c6fD16c2CeeD9",
+            "authorizer": "0x31A23760Db18e604EC688f18850c3dcC3B4368Aa",
+            "paymentProcessor": "0xD6F574062E948d6B7F07c693f1b4240aFeA41657",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0x594a6257a477C6fd15f0dF56d1d319985197c1b0",
+            "issuanceToken": "0xc530B75465Ce3c6286e718110A7B2e2B64Bdc860",
+            "paymentRouter": "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be"
+        },
+        "XADE_FINANCE": {
+            "projectName": "XADE_FINANCE",
+            "orchestrator": "0xebF76b3Af39fF89a8Bf6fcB3F3beeaaCc0fbd0F8",
+            "bondingCurve": "0x1d4fa4979BE3638D46D61e125f992dB703bC3173",
+            "authorizer": "0xea633b9640D18A0f9a9d8cf00A717AC03bD6532b",
+            "paymentProcessor": "0x6d93D90C96954b3B5FD9a685FDb6b73112363d20",
+            "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+            "mintWrapper": "0x89B24B875B1Ab4d5da96201cD0684433F6539881",
+            "issuanceToken": "0xA1a78aC9884aDc9d04d59b2b743f1eC709618e55",
+            "paymentRouter": "0xC7374519fc9DfcDaCD3bd1f337AC98dD3dB09dE9"
+        }
+    },
+    "allUniqueTokens": {
+        "issuanceTokens": [
+            "0xA3dd6163B5742B0D8Cb7d79CB5DFE3F81F8F8fC4",
+            "0x4191F84f66e0B7CC10370Ff47a0E2168E35b9Bdf",
+            "0x0D9B0790E97e3426C161580dF4Ee853E4A7C4607",
+            "0x69CE536f95a84E1eF51Ed0132C514c7CE012E49b",
+            "0x6Fc91FBE42f72941486c98D11724B14Fb8d18b36",
+            "0x5FDAF637Aed59B2e6d384d9e84D8ac5cF03c6697",
+            "0x0b7a46E1af45E1EaadEeD34B55b6FC00A85c7c68",
+            "0xfAFB870F1918827fe57Ca4b891124606EaA7e6bd",
+            "0x878b6bF76F7BA67D0c4Da616eAc1933f9b133C1c",
+            "0x4Fb9B94BD8bBbD684a7D5A5544Bc7A07188E5617",
+            "0xc530B75465Ce3c6286e718110A7B2e2B64Bdc860",
+            "0xA1a78aC9884aDc9d04d59b2b743f1eC709618e55"
+        ],
+        "collateralToken": "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270"
+    },
+    "metadata": {
+        "season": "Season 2 (Most Recent)",
+        "extractedAt": "2025-10-20T00:26:47.984Z",
+        "totalProjects": 12,
+        "totalUniqueIssuanceTokens": 12,
+        "note": "All contract addresses are from Season 2 reports (latest data)"
+    }
+}

@@ -102,7 +102,7 @@ async function main() {
         // Connect to the contract
         //   for (const project in projects) {
         //     const CONTRACT_ADDRESS = "0xb236c6c907051d91e6231557c4563032ff758822";
-        const CONTRACT_ADDRESS = "0x2b3f6dced3c06a31af2b8fb5da8b48496198f3e2";
+        const CONTRACT_ADDRESS = "0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56";
         // console.log(`\nData for ${project} project:`);
 
         // const privateKey = process.env.PRIVATE_KEY;
