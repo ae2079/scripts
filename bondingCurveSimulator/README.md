@@ -6,15 +6,19 @@ Analyze Bancor-style bonding curves with proper support for different collateral
 
 **For contract `0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56`:**
 
-**Exact spot price at 7.5M supply: 0.6505 WPOL/token ($0.125 USD)**
+**Prices at 7.5M supply:**
+- **Buy Price:** 0.6505 WPOL/token ($0.126 USD)
+- **Static Price:** 0.6023 WPOL/token ($0.116 USD)
+- **Sell Price:** 0.5541 WPOL/token ($0.107 USD)
+- **Spread:** 17.39%
 
-To reach 7.5M supply from current 6.55M:
-- **Cost:** 401,326 WPOL ($77,266 USD)
-- **Average price:** 0.4217 WPOL/token ($0.081 USD)
-- **Current price:** 0.2477 WPOL/token ($0.048 USD)
-- **Price impact:** +163% (spot at target vs. current)
+**To reach 7.5M supply from current 6.55M:**
+- **Cost:** 401,326 WPOL ($77,517 USD)
+- **Average price:** 0.4217 WPOL/token (+70%)
+- **Current buy price:** 0.2477 WPOL/token
+- **Buy price at target:** 0.6505 WPOL/token (+163%)
 
-The spot price at target is 54% higher than the average due to the exponential curve (12.5% reserve ratio).
+The buy price at target is 54% higher than the average due to the exponential curve (12.5% reserve ratio).
 
 *Calculated using actual contract's calculatePurchaseReturn() function*
 
@@ -24,7 +28,10 @@ The spot price at target is 54% higher than the average due to the exponential c
 # Install
 npm install
 
-# Check by project name (easiest!)
+# Analyze ALL projects at once (generates 24 reports!)
+npm run all
+
+# Check by project name
 node checkProject.js AKARUN 7500000
 node checkProject.js list  # Show all 12 projects
 
@@ -32,13 +39,48 @@ node checkProject.js list  # Show all 12 projects
 node check.js 0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56 7500000
 
 # npm shortcuts
+npm run all      # Batch analyze all projects
 npm run project AKARUN 7500000
 npm run price
 ```
 
 ## Tools
 
-### 1. checkProject.js (Easiest!)
+### 1. analyzeAll.js (Batch Analysis)
+Analyze all 12 projects at once and generate comprehensive reports.
+
+```bash
+node analyzeAll.js
+# or
+npm run all
+```
+
+**Output:**
+- 12 JSON reports (machine-readable, per project)
+- 12 Markdown reports (human-readable, per project)
+- 1 summary.json (complete portfolio data with totals)
+- 1 summary.md (comprehensive portfolio analysis)
+- Console summary tables (costs and prices)
+
+**Output Files:**
+- Uses project names for filenames: `AKARUN_2025-10-20T01-13-42.json/md`
+- Includes project name in report header
+- Organized by timestamp for historical tracking
+
+**Summary Report Includes:**
+- Total WPOL/USD cost to reach 7.5M across all projects
+- Per-project cost breakdown (tokens to buy, WPOL needed)
+- Prices at target supply (buy/static/sell) for each project
+- Current vs target price comparisons
+- Complete project details in one place
+
+**Perfect for:**
+- Portfolio budgeting and planning
+- Cross-project comparison
+- Investment analysis
+- Historical snapshots
+
+### 2. checkProject.js (Single Project)
 Check any project from your tokensInfo.json by name.
 
 ```bash
@@ -54,8 +96,9 @@ node checkProject.js list  # Show all 12 projects
 - ✓ Check by project name (no need to remember addresses)
 - ✓ Analyzes all 12 Season 2 projects
 - ✓ Shows project info + full curve analysis
+- ✓ Reports named with project name: `AKARUN_timestamp.json/md`
 
-### 2. check.js (Main Tool)
+### 3. check.js (By Contract Address)
 **Accurate** bonding curve analysis using actual smart contract calculations.
 
 ```bash
@@ -74,23 +117,24 @@ node check.js 0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56 7500000 0.20
 - ✓ Auto-detects collateral token & decimals
 - ✓ Calculates exact spot price at target supply
 - ✓ **Generates JSON and Markdown reports with `--report` flag**
+- ✓ **Report files use short contract address when project name not provided**
 - ✓ **No approximations - all values from actual contract**
 
-### 3. getPrice.js
+### 4. getPrice.js
 Get current POL price from CoinGecko.
 
 ```bash
 node getPrice.js
 ```
 
-### 4. getToken.js
+### 5. getToken.js
 Detect collateral token and its details.
 
 ```bash
 node getToken.js <address>
 ```
 
-### 5. compare.js
+### 6. compare.js
 Compare multiple curves side-by-side.
 
 ```bash
@@ -98,7 +142,7 @@ node compare.js <address1> <address2> [address3...]
 node compare.js --config --export
 ```
 
-### 6. export.js
+### 7. export.js
 Export data to JSON, CSV, or Markdown.
 
 ```bash
@@ -212,6 +256,11 @@ node checkProject.js AKARUN 7500000 --save
 # - Markdown file: Formatted report (human-readable)
 ```
 
+**File Naming:**
+- With project name: `AKARUN_2025-10-20T01-13-42.json/md`
+- Without project: `0x9776b3A8_2025-10-20T01-13-42.json/md`
+- Includes timestamp for historical tracking
+
 **Report Contents:**
 - Current state (supply, collateral, fees, reserve ratio)
 - Current prices (buy/sell/spread)
@@ -223,16 +272,61 @@ node checkProject.js AKARUN 7500000 --save
 
 ```
 BondingCurveSimulator/
-├── checkProject.js  # Check by project name (easiest!)
-├── check.js         # Main tool - check bonding curves
+├── analyzeAll.js    # Batch analyze all projects ⭐
+├── checkProject.js  # Check by project name
+├── check.js         # Check by contract address
 ├── getPrice.js      # Fetch POL price from CoinGecko
 ├── getToken.js      # Detect collateral token
 ├── compare.js       # Compare multiple curves
 ├── export.js        # Export data to CSV/JSON/MD
 ├── config.js        # Configuration
 ├── package.json     # NPM configuration
+├── tokensInfo.json  # Project contracts (12 projects)
 ├── reports/         # Auto-generated reports (gitignored)
+│   ├── summary.json # Portfolio summary with totals
+│   ├── summary.md   # Human-readable portfolio analysis
+│   └── *.json/md    # Individual project reports
 └── README.md        # This file
+```
+
+## Portfolio Summary Report
+
+The `summary.md` report generated by `npm run all` includes:
+
+### 1. Total Cost to Reach Target
+- Total WPOL needed across all 12 projects
+- Total USD cost
+
+### 2. Cost Breakdown by Project
+- Tokens to buy for each project
+- WPOL cost per project
+- USD cost per project
+
+### 3. Prices at Target Supply (7.5M)
+- Buy price (with 8% fee)
+- Static price (base price)
+- Sell price (with 8% fee)
+- Average buy price during accumulation
+
+### 4. Current vs Target Prices
+- Price comparison for each project
+- Percentage change
+
+### 5. Individual Project Details
+- Complete breakdown for all 12 projects
+- Contract addresses
+- All key metrics in one place
+
+**Example Summary:**
+```
+Total Cost to Reach 7.5M Supply:
+  WPOL: 4,800,000 WPOL
+  USD:  $930,000 USD
+
+Cost Breakdown:
+  AKARUN:        401,326 WPOL  ($77,648)
+  ANCIENT_BEAST: 403,965 WPOL  ($78,167)
+  ...
 ```
 
 ## License

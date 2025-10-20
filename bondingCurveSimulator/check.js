@@ -84,11 +84,12 @@ async function calculateExactCostToBuy(contract, tokenAmount, tokenDecimals) {
     };
 }
 
-async function accurateCheck(contractAddress, targetSupply = null, polPriceUSD = null, saveReport = false) {
+async function accurateCheck(contractAddress, targetSupply = null, polPriceUSD = null, saveReport = false, projectName = null) {
     const reportData = {
         timestamp: new Date().toISOString(),
         contract: contractAddress,
         network: "Polygon",
+        projectName: projectName,
     };
     const RPC_URL = process.env.RPC_URL || config.rpc.polygon;
     const provider = new ethers.JsonRpcProvider(RPC_URL);
@@ -218,10 +219,10 @@ async function accurateCheck(contractAddress, targetSupply = null, polPriceUSD =
             console.log(`      Tokens received: ${tokensActuallyReceived.toLocaleString(undefined, {maximumFractionDigits: 2})}`);
             console.log(`      Converged:       ${result.converged ? 'Yes ✓' : 'Close approximation'}`);
 
-            // Calculate EXACT spot price at target by finding marginal cost
-            console.log(`\n   ⏳ Calculating exact spot price at ${targetSupply.toLocaleString()} supply...`);
+            // Calculate EXACT prices at target supply
+            console.log(`\n   ⏳ Calculating exact prices at ${targetSupply.toLocaleString()} supply...`);
 
-            // To find spot price at target, we'll buy up to target-100, then to target+100
+            // To find prices at target, we'll buy up to target-100, then to target+100
             // and calculate the marginal cost per token in that range
             const tokensToTarget = targetSupply - currentSupply;
             const tokensBefore = tokensToTarget - 100; // 100 tokens before target
@@ -234,24 +235,33 @@ async function accurateCheck(contractAddress, targetSupply = null, polPriceUSD =
             const collateralAfter = Number(ethers.formatUnits(resultAfter.collateralNeeded, tokenDecimals));
             const tokensBought = Number(ethers.formatUnits(resultAfter.tokensReceived, 18)) - Number(ethers.formatUnits(resultBefore.tokensReceived, 18));
 
-            // Marginal price = cost difference / token difference
-            const spotPrice = (collateralAfter - collateralBefore) / tokensBought;
-            const spotPriceUSD = spotPrice * polPriceUSD;
+            // Buy price (with fee) = marginal cost
+            const spotBuyPrice = (collateralAfter - collateralBefore) / tokensBought;
+            const spotBuyPriceUSD = spotBuyPrice * polPriceUSD;
 
-            console.log(`\n   💎 Exact Spot Price at ${targetSupply.toLocaleString()} Supply:`);
-            console.log(`      ${spotPrice.toFixed(8)} ${tokenSymbol}/token`);
-            console.log(`      ($${spotPriceUSD.toFixed(6)} USD/token)`);
-            console.log(`      (Marginal price to buy 1 token at that point)`);
+            // Static price (without fee) = buy price / (1 + buy fee)
+            const spotStaticPrice = spotBuyPrice / 1.08; // Remove 8% buy fee
+            const spotStaticPriceUSD = spotStaticPrice * polPriceUSD;
+
+            // Sell price (with fee) = static price * (1 - sell fee)
+            const spotSellPrice = spotStaticPrice * 0.92; // Apply 8% sell fee
+            const spotSellPriceUSD = spotSellPrice * polPriceUSD;
+
+            console.log(`\n   💎 Exact Prices at ${targetSupply.toLocaleString()} Supply:`);
+            console.log(`      Buy Price:    ${spotBuyPrice.toFixed(8)} ${tokenSymbol}/token ($${spotBuyPriceUSD.toFixed(6)})`);
+            console.log(`      Static Price: ${spotStaticPrice.toFixed(8)} ${tokenSymbol}/token ($${spotStaticPriceUSD.toFixed(6)})`);
+            console.log(`      Sell Price:   ${spotSellPrice.toFixed(8)} ${tokenSymbol}/token ($${spotSellPriceUSD.toFixed(6)})`);
+            console.log(`      Spread:       ${((spotBuyPrice - spotSellPrice) / spotSellPrice * 100).toFixed(2)}%`);
 
             // Price comparison
             const avgPriceIncrease = ((avgPrice / buyPriceInToken - 1) * 100);
-            const spotPriceIncrease = ((spotPrice / buyPriceInToken - 1) * 100);
-            console.log(`\n   📊 Price Comparison:`);
+            const spotPriceIncrease = ((spotBuyPrice / buyPriceInToken - 1) * 100);
+            console.log(`\n   📊 Price Comparison (Buy Price):`);
             console.log(`      Current Supply (${currentSupply.toLocaleString()}):  ${buyPriceInToken.toFixed(8)} ${tokenSymbol}/token`);
             console.log(`      Average to Target:        ${avgPrice.toFixed(8)} ${tokenSymbol}/token  (+${avgPriceIncrease.toFixed(2)}%)`);
-            console.log(`      Spot at Target:           ${spotPrice.toFixed(8)} ${tokenSymbol}/token  (+${spotPriceIncrease.toFixed(2)}%)`);
+            console.log(`      Buy Price at Target:      ${spotBuyPrice.toFixed(8)} ${tokenSymbol}/token  (+${spotPriceIncrease.toFixed(2)}%)`);
             console.log(``);
-            console.log(`      💡 The spot price at target is ${((spotPrice / avgPrice - 1) * 100).toFixed(1)}% higher than average`);
+            console.log(`      💡 The buy price at target is ${((spotBuyPrice / avgPrice - 1) * 100).toFixed(1)}% higher than average`);
             console.log(`         (because of the curve's exponential nature)`);
 
             // Market cap at target
@@ -267,7 +277,12 @@ async function accurateCheck(contractAddress, targetSupply = null, polPriceUSD =
                 tokensNeeded: tokensToBuy,
                 cost: { wpol: collateralNeeded, usd: collateralNeeded * polPriceUSD },
                 averagePrice: { wpol: avgPrice, usd: avgPriceUSD },
-                spotPriceAtTarget: { wpol: spotPrice, usd: spotPriceUSD },
+                pricesAtTarget: {
+                    buy: { wpol: spotBuyPrice, usd: spotBuyPriceUSD },
+                    static: { wpol: spotStaticPrice, usd: spotStaticPriceUSD },
+                    sell: { wpol: spotSellPrice, usd: spotSellPriceUSD },
+                    spread: ((spotBuyPrice - spotSellPrice) / spotSellPrice * 100)
+                },
                 priceIncrease: { average: avgPriceIncrease, spot: spotPriceIncrease },
                 marketCapAtTarget: { wpol: targetMcapToken, usd: targetMcapUSD },
             };
@@ -278,7 +293,7 @@ async function accurateCheck(contractAddress, targetSupply = null, polPriceUSD =
 
         // Save report if requested
         if (saveReport) {
-            saveReportToFile(reportData, contractAddress);
+            saveReportToFile(reportData, contractAddress, projectName);
         }
 
         return reportData;
@@ -296,7 +311,7 @@ async function accurateCheck(contractAddress, targetSupply = null, polPriceUSD =
 /**
  * Save report to file in JSON and Markdown formats
  */
-function saveReportToFile(data, contractAddress) {
+function saveReportToFile(data, contractAddress, projectName = null) {
     const reportsDir = path.join(__dirname, 'reports');
 
     // Create reports directory if it doesn't exist
@@ -305,8 +320,9 @@ function saveReportToFile(data, contractAddress) {
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
-    const shortAddr = contractAddress.slice(0, 10);
-    const basename = `${shortAddr}_${timestamp}`;
+    // Use project name if provided, otherwise use short contract address
+    const filePrefix = projectName || contractAddress.slice(0, 10);
+    const basename = `${filePrefix}_${timestamp}`;
 
     // Save JSON (with BigInt handling)
     const jsonPath = path.join(reportsDir, `${basename}.json`);
@@ -330,6 +346,9 @@ function saveReportToFile(data, contractAddress) {
 function generateMarkdownReport(data) {
     const d = data;
     let md = `# Bonding Curve Analysis Report\n\n`;
+    if (d.projectName) {
+        md += `**Project:** ${d.projectName}\n\n`;
+    }
     md += `**Generated:** ${new Date(d.timestamp).toLocaleString()}\n\n`;
     md += `**Contract:** \`${d.contract}\`  \n`;
     md += `**Network:** ${d.network}  \n`;
@@ -360,12 +379,25 @@ function generateMarkdownReport(data) {
         md += `- **USD Cost:** $${d.targetAnalysis.cost.usd.toLocaleString(undefined, {maximumFractionDigits: 2})}\n`;
         md += `- **Tokens to Buy:** ${d.targetAnalysis.tokensNeeded.toLocaleString(undefined, {maximumFractionDigits: 2})}\n\n`;
 
-        md += `### Prices\n\n`;
+        md += `### Price Progression\n\n`;
         md += `| Metric | WPOL/token | USD/token | Change |\n`;
         md += `|--------|------------|-----------|--------|\n`;
-        md += `| Current | ${d.currentPrices.buy.wpol.toFixed(8)} | $${d.currentPrices.buy.usd.toFixed(6)} | - |\n`;
-        md += `| Average | ${d.targetAnalysis.averagePrice.wpol.toFixed(8)} | $${d.targetAnalysis.averagePrice.usd.toFixed(6)} | +${d.targetAnalysis.priceIncrease.average.toFixed(2)}% |\n`;
-        md += `| Spot at Target | ${d.targetAnalysis.spotPriceAtTarget.wpol.toFixed(8)} | $${d.targetAnalysis.spotPriceAtTarget.usd.toFixed(6)} | +${d.targetAnalysis.priceIncrease.spot.toFixed(2)}% |\n\n`;
+        md += `| Current Buy Price | ${d.currentPrices.buy.wpol.toFixed(8)} | $${d.currentPrices.buy.usd.toFixed(6)} | - |\n`;
+        md += `| Average Buy Price | ${d.targetAnalysis.averagePrice.wpol.toFixed(8)} | $${d.targetAnalysis.averagePrice.usd.toFixed(6)} | +${d.targetAnalysis.priceIncrease.average.toFixed(2)}% |\n`;
+
+        if (d.targetAnalysis.pricesAtTarget) {
+            md += `| Buy Price at Target | ${d.targetAnalysis.pricesAtTarget.buy.wpol.toFixed(8)} | $${d.targetAnalysis.pricesAtTarget.buy.usd.toFixed(6)} | +${d.targetAnalysis.priceIncrease.spot.toFixed(2)}% |\n\n`;
+
+            md += `### Prices at Target Supply\n\n`;
+            md += `| Type | WPOL/token | USD/token |\n`;
+            md += `|------|------------|----------|\n`;
+            md += `| Buy Price | ${d.targetAnalysis.pricesAtTarget.buy.wpol.toFixed(8)} | $${d.targetAnalysis.pricesAtTarget.buy.usd.toFixed(6)} |\n`;
+            md += `| Static Price | ${d.targetAnalysis.pricesAtTarget.static.wpol.toFixed(8)} | $${d.targetAnalysis.pricesAtTarget.static.usd.toFixed(6)} |\n`;
+            md += `| Sell Price | ${d.targetAnalysis.pricesAtTarget.sell.wpol.toFixed(8)} | $${d.targetAnalysis.pricesAtTarget.sell.usd.toFixed(6)} |\n`;
+            md += `| **Spread** | | **${d.targetAnalysis.pricesAtTarget.spread.toFixed(2)}%** |\n\n`;
+        } else {
+            md += `| Buy Price at Target | ${d.targetAnalysis.spotPriceAtTarget.wpol.toFixed(8)} | $${d.targetAnalysis.spotPriceAtTarget.usd.toFixed(6)} | +${d.targetAnalysis.priceIncrease.spot.toFixed(2)}% |\n\n`;
+        }
 
         md += `### Market Cap at Target\n\n`;
         md += `- **WPOL:** ${d.targetAnalysis.marketCapAtTarget.wpol.toLocaleString(undefined, {maximumFractionDigits: 2})}\n`;

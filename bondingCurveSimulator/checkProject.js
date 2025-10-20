@@ -107,7 +107,7 @@ Examples:
     console.log('═'.repeat(70));
 
     // Run the accurate check
-    await accurateCheck(project.bondingCurve, targetSupply, null, saveReport);
+    await accurateCheck(project.bondingCurve, targetSupply, null, saveReport, projectName);
 }
 
 if (require.main === module) {
