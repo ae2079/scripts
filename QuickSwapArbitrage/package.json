@@ -1,0 +1,30 @@
+{
+    "name": "quickswap-arbitrage-analyzer",
+    "version": "1.0.0",
+    "description": "Analyze QuickSwap LPs and calculate arbitrage opportunities with bonding curves",
+    "main": "analyze.js",
+    "scripts": {
+        "start": "node analyze.js",
+        "analyze": "node analyze.js",
+        "lp": "node getLPData.js",
+        "arbitrage": "node calculateArbitrage.js",
+        "compare": "node comparePrices.js"
+    },
+    "keywords": [
+        "quickswap",
+        "arbitrage",
+        "bonding-curve",
+        "defi",
+        "polygon"
+    ],
+    "author": "",
+    "license": "MIT",
+    "type": "commonjs",
+    "dependencies": {
+        "@uniswap/sdk-core": "^7.8.0",
+        "@uniswap/v3-sdk": "^3.26.0",
+        "axios": "^1.6.8",
+        "dotenv": "^16.3.1",
+        "ethers": "^6.11.1"
+    }
+}
