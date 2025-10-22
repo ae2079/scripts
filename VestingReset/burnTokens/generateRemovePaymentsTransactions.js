@@ -1,5 +1,9 @@
 import fs from 'fs';
 import { ethers } from 'ethers';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 const FUNCTION_SELECTORS = {
     approve: "0x095ea7b3",
@@ -15,7 +19,7 @@ const PAYMENT_PROCESSOR_ABI = [
 ];
 
 // Configuration for blockchain interaction
-const RPC_URL = "https://polygon-rpc.com"; // Polygon Mainnet RPC
+const RPC_URL = process.env.RPC_URL || "https://polygon-rpc.com"; // Fallback to free RPC if env var not set
 
 // Circuit Breaker Configuration
 const CIRCUIT_BREAKER_CONFIG = {
@@ -134,6 +138,49 @@ function readTransactionFile(filename) {
         return transactionData;
     } catch (error) {
         console.error(`❌ Error reading file ${filename}:`, error.message);
+        throw error;
+    }
+}
+
+function readProjectConfigFromReport(reportFile) {
+    try {
+        const data = fs.readFileSync(reportFile, 'utf8');
+        const reportData = JSON.parse(data);
+
+        // Extract project configuration from report file
+        const projectName = reportData.projectName;
+        const paymentRouter = reportData.queries ? reportData.queries.addresses ? reportData.queries.addresses.paymentRouter : null : null;
+        const orchestrator = reportData.queries ? reportData.queries.addresses ? reportData.queries.addresses.orchestrator : null : null;
+        const safe = reportData.inputs ? reportData.inputs.projectConfig ? reportData.inputs.projectConfig.SAFE : null : null;
+        const paymentProcessor = reportData.queries ? reportData.queries.addresses ? reportData.queries.addresses.paymentProcessor : null : null;
+
+        console.log(`✅ Successfully loaded project configuration from: ${reportFile}`);
+        console.log(`📍 Project Name: ${projectName}`);
+        console.log(`📍 Payment Router: ${paymentRouter}`);
+        console.log(`📍 Orchestrator: ${orchestrator}`);
+        console.log(`📍 Safe: ${safe}`);
+        console.log(`📍 Payment Processor: ${paymentProcessor}`);
+
+        // Validate required fields
+        if (!projectName) {
+            throw new Error('Project name not found in report file');
+        }
+        if (!paymentRouter) {
+            throw new Error('Payment router address not found in report file');
+        }
+        if (!paymentProcessor) {
+            throw new Error('Payment processor address not found in report file');
+        }
+
+        return {
+            projectName,
+            paymentRouter,
+            orchestrator,
+            safe,
+            paymentProcessor
+        };
+    } catch (error) {
+        console.error(`❌ Error reading project config from ${reportFile}:`, error.message);
         throw error;
     }
 }
@@ -284,36 +331,44 @@ function generateTransactionJson(safe, projectName, paymentProcessor, client, us
 // Main execution
 async function main() {
     try {
-        const projectName = 'X23';
-        const paymentProcessor = "0xD6F574062E948d6B7F07c693f1b4240aFeA41657";
-        const paymentRouterAddress = "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be";
+        const reportFile = '1.json'; // Primary report file to extract project config from
+
+        console.log('📖 Reading project configuration from report file...\n');
+        const projectConfig = readProjectConfigFromReport(reportFile);
+
+        const projectName = projectConfig.projectName;
+        const paymentProcessor = projectConfig.paymentProcessor;
+        const paymentRouterAddress = projectConfig.paymentRouter;
         const workflowAdminMultisig = "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e";
 
-        console.log('📖 Reading transaction files...\n');
+        console.log('\n📖 Reading transaction files...\n');
 
-        const filesData = readTransactionFile("4.json");
-        const qaccUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
+        const filesData = readTransactionFile("1.json");
+        const totalUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
 
-        const filesDataEA1 = readTransactionFile("1.json");
-        const ea1Users = getUserAddressesFromTransactions(filesDataEA1.transactions.readable);
+        // const filesData = readTransactionFile("4.json");
+        // const qaccUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
 
-        const filesDataEA2 = readTransactionFile("2.json");
-        const ea2Users = getUserAddressesFromTransactions(filesDataEA2.transactions.readable);
+        // const filesDataEA1 = readTransactionFile("1.json");
+        // const ea1Users = getUserAddressesFromTransactions(filesDataEA1.transactions.readable);
 
-        const filesDataEA3 = readTransactionFile("3.json");
-        const ea3Users = getUserAddressesFromTransactions(filesDataEA3.transactions.readable);
+        // const filesDataEA2 = readTransactionFile("2.json");
+        // const ea2Users = getUserAddressesFromTransactions(filesDataEA2.transactions.readable);
 
-        const filesDataS2 = readTransactionFile("5.json");
-        const S2Users = getUserAddressesFromTransactions(filesDataS2.transactions.readable);
+        // const filesDataEA3 = readTransactionFile("3.json");
+        // const ea3Users = getUserAddressesFromTransactions(filesDataEA3.transactions.readable);
+
+        // const filesDataS2 = readTransactionFile("5.json");
+        // const S2Users = getUserAddressesFromTransactions(filesDataS2.transactions.readable);
 
         // Union all EA users and remove duplicates
-        const allEAUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users])];
-        const totalUsers = [...new Set([...allEAUsers, ...qaccUsers, ...S2Users])];
+        // const allEAUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users])];
+        // const totalUsers = [...new Set([...allEAUsers, ...qaccUsers, ...S2Users])];
 
         console.log(`\n📊 User Statistics:`);
-        console.log(`   Total EA users: ${allEAUsers.length}`);
-        console.log(`   QACC S1 users: ${qaccUsers.length}`);
-        console.log(`   S2 users: ${S2Users.length}`);
+        // console.log(`   Total EA users: ${allEAUsers.length}`);
+        // console.log(`   QACC S1 users: ${qaccUsers.length}`);
+        // console.log(`   S2 users: ${S2Users.length}`);
         console.log(`   Total users: ${totalUsers.length}`);
 
         const manualUsers = [
@@ -345,11 +400,20 @@ async function main() {
         ];
 
         // Filter to only include users with active payment streams
-        const activeUsers = await filterActiveUsers(manualUsers, paymentRouterAddress, paymentProcessor);
+        // const activeUsers = await filterActiveUsers(manualUsers, paymentRouterAddress, paymentProcessor);
+        const activeUsers = await filterActiveUsers(totalUsers, paymentRouterAddress, paymentProcessor);
 
         if (activeUsers.length === 0) {
             console.log('⚠️  No active users found. No removal transactions needed!');
             return;
+        }
+
+        if (activeUsers.length !== totalUsers.length) {
+            console.log('⚠️  Some users have no active streams');
+            const inactiveUsers = totalUsers.filter(user => !activeUsers.includes(user));
+            console.log(`   Inactive users: ${inactiveUsers.length}`);
+            console.log(`   Inactive users addresses: ${inactiveUsers.join(', ')}`);
+            console.log('-' * 100);
         }
 
         console.log(`🔨 Generating removal transactions for ${activeUsers.length} active users...\n`);

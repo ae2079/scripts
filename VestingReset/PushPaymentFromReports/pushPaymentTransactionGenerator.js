@@ -228,6 +228,8 @@ if (!originalStart || !originalEnd) {
 const start = originalStart + originalCliff;
 const cliff = 0;
 const end = originalEnd;
+// const start = 1762185600;
+// const end = start + 7 * 24 * 60 * 60; // 7 days after start
 
 console.log(`   Original Start: ${originalStart} (${new Date(originalStart * 1000).toISOString()})`);
 console.log(`   Original Cliff: ${originalCliff} seconds (${Math.floor(originalCliff / 86400)} days)`);

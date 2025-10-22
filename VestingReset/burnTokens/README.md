@@ -13,6 +13,26 @@ This script:
 
 ## 🚀 Usage
 
+### Environment Setup
+
+1. **Copy the environment template:**
+   ```bash
+   cp env.example .env
+   ```
+
+2. **Edit `.env` file with your RPC URL:**
+   ```bash
+   # Use your paid RPC provider for better rate limits
+   RPC_URL=https://your-paid-rpc-provider.com/your-api-key
+   ```
+
+   **Recommended RPC providers:**
+   - Alchemy: `https://polygon-mainnet.g.alchemy.com/v2/YOUR_API_KEY`
+   - Infura: `https://polygon-mainnet.infura.io/v3/YOUR_PROJECT_ID`
+   - QuickNode: `https://polygon-mainnet.quiknode.pro/YOUR_API_KEY/`
+
+   **Note:** Using a paid RPC provider is recommended for better rate limits and reliability when checking hundreds of users.
+
 ### Quick Start
 
 ```bash
@@ -147,23 +167,27 @@ Result: No files generated, message shown:
 ## 🔧 Configuration
 
 The script reads from these files:
-- `1.json` - EA1 users
+- `1.json` - EA1 users + **Project configuration source**
 - `2.json` - EA2 users  
 - `3.json` - EA3 users
 - `4.json` - QACC users
 - `5.json` - S2 users
 
-**Contract Addresses:**
-```javascript
-const paymentProcessor = "0xD6F574062E948d6B7F07c693f1b4240aFeA41657";
-const paymentRouterAddress = "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be";
-const workflowAdminMultisig = "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e";
-```
+**Project Configuration:**
+The script automatically reads project configuration from `1.json`:
+- Project name: `projectName` field
+- Payment router: `queries.addresses.paymentRouter`
+- Orchestrator: `queries.addresses.orchestrator`
+- Safe: `inputs.projectConfig.SAFE`
+- Payment processor: `queries.addresses.paymentProcessor`
+
+**To use a different project:**
+1. Replace `1.json` with your project's report file
+2. Update the `reportFile` variable in the script if using a different filename
+3. The script will automatically extract all configuration from the report file
 
 **RPC URL:**
-```javascript
-const RPC_URL = "https://polygon-rpc.com";
-```
+Configured via `.env` file (see Environment Setup section above)
 
 ## ⚠️ Important Notes
 
