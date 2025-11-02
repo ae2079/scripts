@@ -6,10 +6,12 @@
     "main": "fetchUserStreamData.js",
     "scripts": {
         "fetch": "node fetchUserStreamData.js",
-        "check": "node checkActiveStreams.js"
+        "check": "node checkActiveStreams.js",
+        "convert": "node convertToCSV.js"
     },
     "dependencies": {
-        "ethers": "^6.9.0"
+        "ethers": "^6.9.0",
+        "dotenv": "^16.4.5"
     },
     "author": "",
     "license": "MIT"

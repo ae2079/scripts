@@ -9,6 +9,7 @@ package-lock.json
 # Output files
 *.json
 !package.json
+*.csv
 
 # System files
 .DS_Store

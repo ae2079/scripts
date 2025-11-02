@@ -1,5 +1,9 @@
 import fs from 'fs';
 import { ethers } from 'ethers';
+import dotenv from 'dotenv';
+
+// Load environment variables from .env file
+dotenv.config();
 
 // Payment Processor ABI - only the methods we need
 // Note: viewAllPaymentOrders actually returns (token, streamId, amount, released, start, cliff, end)
@@ -11,7 +15,7 @@ const PAYMENT_PROCESSOR_ABI = [
 ];
 
 // Configuration
-const RPC_URL = "https://polygon-rpc.com"; // Polygon Mainnet RPC
+const RPC_URL = process.env.RPC_URL || "https://polygon-rpc.com"; // Polygon Mainnet RPC (fallback to public RPC if not set)
 const paymentProcessorAddress = "0xD6F574062E948d6B7F07c693f1b4240aFeA41657";
 const paymentRouterAddress = "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be"; // client address
 
