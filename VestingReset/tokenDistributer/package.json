@@ -1,0 +1,28 @@
+{
+    "name": "token-distributer",
+    "version": "1.0.0",
+    "description": "Generate Safe transaction JSON files for token distributions from CSV",
+    "type": "module",
+    "main": "generateDistributions.js",
+    "scripts": {
+        "generate": "node generateDistributions.js",
+        "generate:safe": "SAFE_ADDRESS=$SAFE_ADDRESS node generateDistributions.js",
+        "calculate": "node calculateTotal.js"
+    },
+    "keywords": [
+        "safe",
+        "token",
+        "distribution",
+        "ethereum",
+        "polygon",
+        "transaction"
+    ],
+    "author": "",
+    "license": "MIT",
+    "dependencies": {
+        "ethers": "^6.11.1"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
