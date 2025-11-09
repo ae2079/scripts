@@ -36,6 +36,7 @@ dotenv.config();
  * - RPC_URL (optional)
  * - CHAIN_ID (optional, can also be passed via command line)
  * - USE_QUEUE_NONCE (optional, set to 'true' to use queue nonce instead of current nonce)
+ * - MANUAL_NONCE (optional, manually specify starting nonce, overrides all other nonce options)
  * 
  * Note: SAFE_ADDRESS is automatically extracted from transaction files (meta.createdFromSafeAddress)
  */
@@ -45,9 +46,12 @@ const CONFIG = {
     // MultiSendCallOnly 1.4.1 contract - Safe delegates to it, it makes CALLs to targets
     // Required for Safes that restrict delegate calls to untrusted contracts
     MULTI_SEND_CALL_ONLY_ADDRESS: '0x9641d764fc13c8B624c04430C7356C1C7C8102e2',
-    // If true, uses the highest pending nonce + 1 (appends to queue)
+    // If true, uses the highest pending nonce (appends to queue)
     // If false, uses current nonce (may overwrite pending transactions)
-    USE_QUEUE_NONCE: process.env.USE_QUEUE_NONCE === 'true'
+    USE_QUEUE_NONCE: process.env.USE_QUEUE_NONCE === 'true',
+    // Manually specify starting nonce (takes priority over USE_QUEUE_NONCE)
+    // Set to a number to use a specific nonce, or leave undefined for automatic
+    MANUAL_NONCE: process.env.MANUAL_NONCE ? parseInt(process.env.MANUAL_NONCE, 10) : undefined
 };
 
 /**
@@ -157,20 +161,30 @@ async function initializeSafe(privateKey, safeAddress, chainId) {
 
 /**
  * Gets the next available nonce for the Safe
- * If USE_QUEUE_NONCE is true, returns the highest pending nonce + 1
- * Otherwise, returns the current nonce (next nonce to be executed)
+ * Priority: MANUAL_NONCE > USE_QUEUE_NONCE > current nonce
+ * - If MANUAL_NONCE is set, uses that value
+ * - If USE_QUEUE_NONCE is true, returns the highest pending nonce
+ * - Otherwise, returns the current nonce (next nonce to be executed)
  */
-async function getStartingNonce(protocolKit, apiKit, safeAddress, useQueueNonce) {
+async function getStartingNonce(protocolKit, apiKit, safeAddress, useQueueNonce, manualNonce) {
     try {
+        // Priority 1: Manual nonce (if specified)
+        if (manualNonce !== undefined) {
+            console.log(`✋ Using manually specified nonce: ${manualNonce}`);
+            console.log(`⚠️  Make sure this nonce is correct to avoid conflicts!`);
+            return manualNonce;
+        }
+
         // Get current nonce (next nonce to be executed)
         const currentNonce = await protocolKit.getNonce();
 
+        // Priority 2: Current nonce (if not using queue nonce)
         if (!useQueueNonce) {
             console.log(`📍 Using current nonce (may overwrite pending transactions)`);
             return currentNonce;
         }
 
-        // Get pending transactions from the queue
+        // Priority 3: Queue nonce (highest pending nonce)
         console.log(`🔍 Checking for pending transactions in queue...`);
         const pendingTxs = await apiKit.getPendingTransactions(safeAddress);
 
@@ -188,7 +202,7 @@ async function getStartingNonce(protocolKit, apiKit, safeAddress, useQueueNonce)
 
         console.log(`📋 Found ${pendingTxs.results.length} pending transaction(s)`);
         console.log(`🔢 Current nonce: ${currentNonce}`);
-        console.log(`🔢 Highest pending nonce: ${highestPendingNonce}`);
+        console.log(`🔢 Highest pending nonce: ${highestPendingNonce - 1}`);
         console.log(`🔢 Next queue nonce: ${nextQueueNonce}`);
         console.log(`✅ Using queue nonce to append to existing queue`);
 
@@ -325,8 +339,8 @@ async function proposeAllTransactions(directoryPath, privateKey, chainId, delayB
         }
         console.log(`✅ Verified: Signer is an owner of the Safe`);
 
-        // Get the starting nonce (current or queue nonce based on config)
-        let currentNonce = await getStartingNonce(protocolKit, apiKit, safeAddress, CONFIG.USE_QUEUE_NONCE);
+        // Get the starting nonce (manual, queue, or current nonce based on config)
+        let currentNonce = await getStartingNonce(protocolKit, apiKit, safeAddress, CONFIG.USE_QUEUE_NONCE, CONFIG.MANUAL_NONCE);
         console.log(`\n🔢 Starting nonce: ${currentNonce}`);
         console.log(`📦 Total batches to propose: ${transactionFiles.length}`);
         console.log(`🔢 Nonces will be assigned: ${currentNonce} to ${currentNonce + transactionFiles.length - 1}`);
@@ -420,8 +434,8 @@ async function proposeSingleTransaction(filePath, privateKey, chainId) {
         }
         console.log(`✅ Verified: Signer is an owner of the Safe`);
 
-        // Get the starting nonce (current or queue nonce based on config)
-        const currentNonce = await getStartingNonce(protocolKit, apiKit, safeAddress, CONFIG.USE_QUEUE_NONCE);
+        // Get the starting nonce (manual, queue, or current nonce based on config)
+        const currentNonce = await getStartingNonce(protocolKit, apiKit, safeAddress, CONFIG.USE_QUEUE_NONCE, CONFIG.MANUAL_NONCE);
         console.log(`\n🔢 Using nonce: ${currentNonce}`);
 
         // Propose the transaction
@@ -461,11 +475,13 @@ async function main() {
         console.log('\n🔢 Nonce Options (.env file):');
         console.log('   USE_QUEUE_NONCE=false  - Use current nonce (default, may overwrite pending txs)');
         console.log('   USE_QUEUE_NONCE=true   - Use queue nonce (appends to existing queue)');
+        console.log('   MANUAL_NONCE=<number>  - Manually specify starting nonce (overrides all)');
         console.log('\n📝 Examples:');
         console.log('   node proposeSafeTransactions.js single ../X23/pushPayment/transactions_batch1.json');
         console.log('   node proposeSafeTransactions.js batch ../X23/pushPayment');
         console.log('   node proposeSafeTransactions.js batch ../X23/pushPayment 137');
         console.log('   USE_QUEUE_NONCE=true node proposeSafeTransactions.js batch ../X23/pushPayment');
+        console.log('   MANUAL_NONCE=42 node proposeSafeTransactions.js batch ../X23/pushPayment');
         console.log('\n📌 Note: Safe address is automatically read from transaction files');
         process.exit(1);
     }
@@ -484,6 +500,7 @@ async function main() {
         console.log('\n🔢 Nonce Options (.env file):');
         console.log('   USE_QUEUE_NONCE=false  - Use current nonce (default, may overwrite pending txs)');
         console.log('   USE_QUEUE_NONCE=true   - Use queue nonce (appends to existing queue)');
+        console.log('   MANUAL_NONCE=<number>  - Manually specify starting nonce (overrides all)');
         console.log('\n📌 Note: Safe address is automatically read from transaction files');
         process.exit(1);
     }

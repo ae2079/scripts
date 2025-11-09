@@ -14,7 +14,8 @@ And proposes them to your Safe multisig wallet, so other owners can review and a
 
 - ✅ Proposes single transaction files or entire directories (batch mode)
 - ✅ **Automatic nonce management** - assigns sequential nonces to prevent conflicts
-- ✅ **🆕 Queue nonce mode** - appends transactions to queue without overwriting existing ones
+- ✅ **🆕 Queue nonce mode** - replaces the last transaction in queue
+- ✅ **🆕 Manual nonce mode** - specify exact starting nonce for complete control
 - ✅ Uses Safe SDK for secure transaction submission
 - ✅ Verifies signer is a Safe owner before proposing
 - ✅ Provides detailed progress and summary reports with nonce tracking
@@ -83,8 +84,11 @@ If you prefer not to use a `.env` file, you can pass environment variables direc
 # Default behavior (uses current nonce)
 PRIVATE_KEY=0x... node proposeSafeTransactions.js batch ../X23/pushPayment
 
-# Use queue nonce to append to existing queue (recommended)
+# Use queue nonce to replace last transaction in queue
 PRIVATE_KEY=0x... USE_QUEUE_NONCE=true node proposeSafeTransactions.js batch ../X23/pushPayment
+
+# Use manual nonce for complete control (highest priority)
+PRIVATE_KEY=0x... MANUAL_NONCE=42 node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ## Example Workflow
@@ -131,6 +135,11 @@ RPC_URL=https://polygon-rpc.com
 # USE_QUEUE_NONCE=false (default) - Uses current nonce, may overwrite pending transactions
 # USE_QUEUE_NONCE=true (recommended) - Uses queue nonce, appends to existing queue
 USE_QUEUE_NONCE=true
+
+# Manual Nonce (NEW! 🆕)
+# Manually specify starting nonce (overrides USE_QUEUE_NONCE and current nonce)
+# Uncomment and set a number to use a specific nonce
+# MANUAL_NONCE=42
 ```
 
 **Notes:**
@@ -150,8 +159,9 @@ const CONFIG = {
     // MultiSendCallOnly 1.4.1 contract - uses CALL instead of DELEGATE_CALL
     // Required for Safes with delegate calls disabled
     MULTI_SEND_CALL_ONLY_ADDRESS: '0x9641d764fc13c8B624c04430C7356C1C7C8102e2',
-    // Nonce strategy
-    USE_QUEUE_NONCE: true  // false = use current nonce, true = append to queue
+    // Nonce strategies (priority order)
+    MANUAL_NONCE: undefined,  // Set to a number to manually specify nonce (highest priority)
+    USE_QUEUE_NONCE: true     // true = use queue nonce, false = use current nonce
 };
 ```
 
@@ -209,33 +219,58 @@ Transaction JSON → proposeSafeTransactions.js → Safe SDK → Safe API → Sa
 
 ### Nonce Management 🔢
 
-The script now supports **two nonce strategies**:
+The script now supports **three nonce strategies** with priority order:
 
-#### 1. Current Nonce Mode (Default: `USE_QUEUE_NONCE=false`)
+#### 1. Manual Nonce Mode (Highest Priority: `MANUAL_NONCE=<number>`) 🆕
+- Manually specify the exact starting nonce
+- Example: `MANUAL_NONCE=42` starts at nonce 42, then 43, 44...
+- **✅ Benefit**: Complete control over nonce selection
+- **⚠️ Warning**: Make sure the nonce is correct to avoid conflicts
+- **Use when**: You know exactly which nonce you want to use
+- **Overrides**: Both USE_QUEUE_NONCE and current nonce
+
+#### 2. Queue Nonce Mode (`USE_QUEUE_NONCE=true`, Recommended)
+- Checks for pending transactions in the queue
+- Uses the highest pending nonce (replaces the last pending transaction)
+- Example: If queue has nonces 10, 11, 12, starts at nonce 12
+- **✅ Benefit**: Replace the last transaction in queue
+- **Use when**: You have transactions already pending and want to replace the last one
+
+#### 3. Current Nonce Mode (Default: `USE_QUEUE_NONCE=false`)
 - Gets the current Safe nonce (next nonce to be executed)
 - Example: If current nonce is 10, assigns nonces 10, 11, 12...
 - **⚠️ Warning**: May overwrite pending transactions in the queue
 - **Use when**: You want to replace/overwrite existing pending transactions
 
-#### 2. Queue Nonce Mode (Recommended: `USE_QUEUE_NONCE=true`) 🆕
-- Checks for pending transactions in the queue
-- Finds the highest pending nonce and adds 1
-- Example: If queue has nonces 10, 11, 12, starts at nonce 13
-- **✅ Benefit**: Appends to queue without overwriting existing transactions
-- **Use when**: You have transactions already pending and want to add more
+**Priority Order:**
+```
+MANUAL_NONCE (if set)
+    ↓ (if not set)
+USE_QUEUE_NONCE=true (if enabled)
+    ↓ (if disabled or no pending txs)
+Current Nonce (default)
+```
 
 **How it works for multiple batches:**
 ```
 Example with USE_QUEUE_NONCE=true:
 - Current nonce: 5
 - Pending queue: nonces 5, 6, 7
-- Script starts at: nonce 8
-- Batch 1 → nonce 8
-- Batch 2 → nonce 9
-- Batch 3 → nonce 10
+- Script starts at: nonce 7 (highest pending)
+- Batch 1 → nonce 7 (replaces nonce 7)
+- Batch 2 → nonce 8
+- Batch 3 → nonce 9
+
+Example with MANUAL_NONCE=10:
+- Current nonce: 5
+- Pending queue: nonces 5, 6, 7
+- Script starts at: nonce 10 (manual override)
+- Batch 1 → nonce 10
+- Batch 2 → nonce 11
+- Batch 3 → nonce 12
 ```
 
-This prevents **nonce conflicts** where multiple transactions would have the same nonce. Each batch gets its own unique nonce, ensuring they execute in the correct order without overwriting existing pending transactions.
+This prevents **nonce conflicts** where multiple transactions would have the same nonce. Each batch gets its own unique nonce, ensuring they execute in the correct order.
 
 ## How MultiSend Works
 

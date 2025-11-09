@@ -31,8 +31,11 @@ node proposeSafeTransactions.js single ../X23/pushPayment/transactions_batch1.js
 # Default behavior (uses current nonce)
 PRIVATE_KEY=0xYourPrivateKey node proposeSafeTransactions.js batch ../X23/pushPayment
 
-# 🆕 Use queue nonce to append to existing queue (recommended)
+# 🆕 Use queue nonce (replaces last transaction in queue)
 PRIVATE_KEY=0xYourPrivateKey USE_QUEUE_NONCE=true node proposeSafeTransactions.js batch ../X23/pushPayment
+
+# 🆕 Use manual nonce (complete control, highest priority)
+PRIVATE_KEY=0xYourPrivateKey MANUAL_NONCE=42 node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ## 🔧 Configuration
@@ -51,8 +54,11 @@ RPC_URL=https://polygon-rpc.com
 
 # 🆕 NEW: Nonce Configuration
 # USE_QUEUE_NONCE=false (default) - Uses current nonce, may overwrite pending transactions
-# USE_QUEUE_NONCE=true (recommended) - Appends to queue without overwriting
+# USE_QUEUE_NONCE=true (recommended) - Uses highest pending nonce (replaces last tx)
 USE_QUEUE_NONCE=true
+
+# 🆕 Manual Nonce (highest priority, overrides USE_QUEUE_NONCE)
+# MANUAL_NONCE=42
 ```
 
 **Note:** Safe address is automatically extracted from transaction files, no need to configure it.
@@ -111,7 +117,8 @@ VestingReset/
 ## 💡 Tips
 
 - Use **batch mode** to propose multiple transactions at once
-- **🆕 USE_QUEUE_NONCE=true**: Set this to append transactions to your queue without overwriting existing pending transactions
+- **🆕 USE_QUEUE_NONCE=true**: Set this to use the highest pending nonce (replaces last transaction)
+- **🆕 MANUAL_NONCE=<number>**: Set this to manually specify the starting nonce (complete control)
 - **Automatic nonce management**: Each batch gets a unique, sequential nonce (no conflicts!)
 - The script includes 2-second delays between batches to avoid rate limiting
 - Check the console output for transaction hashes, nonces, and links
