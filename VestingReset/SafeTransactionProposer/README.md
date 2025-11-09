@@ -14,6 +14,7 @@ And proposes them to your Safe multisig wallet, so other owners can review and a
 
 - ✅ Proposes single transaction files or entire directories (batch mode)
 - ✅ **Automatic nonce management** - assigns sequential nonces to prevent conflicts
+- ✅ **🆕 Queue nonce mode** - appends transactions to queue without overwriting existing ones
 - ✅ Uses Safe SDK for secure transaction submission
 - ✅ Verifies signer is a Safe owner before proposing
 - ✅ Provides detailed progress and summary reports with nonce tracking
@@ -76,10 +77,14 @@ npm run propose:batch ../X23/pushPayment
 
 ### Alternative: Without .env file
 
-If you prefer not to use a `.env` file, you can pass the private key as an environment variable:
+If you prefer not to use a `.env` file, you can pass environment variables directly:
 
 ```bash
+# Default behavior (uses current nonce)
 PRIVATE_KEY=0x... node proposeSafeTransactions.js batch ../X23/pushPayment
+
+# Use queue nonce to append to existing queue (recommended)
+PRIVATE_KEY=0x... USE_QUEUE_NONCE=true node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ## Example Workflow
@@ -112,7 +117,7 @@ You have three ways to configure the script:
 
 ### 1. Using .env File (Recommended) 🌟
 
-Create a `.env` file (copy from `.env.example`):
+Create a `.env` file:
 
 ```bash
 # Required
@@ -121,12 +126,18 @@ PRIVATE_KEY=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef
 # Optional - Override defaults (usually not needed)
 CHAIN_ID=137
 RPC_URL=https://polygon-rpc.com
+
+# Nonce Configuration (NEW! 🆕)
+# USE_QUEUE_NONCE=false (default) - Uses current nonce, may overwrite pending transactions
+# USE_QUEUE_NONCE=true (recommended) - Uses queue nonce, appends to existing queue
+USE_QUEUE_NONCE=true
 ```
 
 **Notes:**
 - **⚠️ SECURITY**: The `.env` file is in `.gitignore` and will never be committed.
 - **Safe Address**: Automatically extracted from transaction files (no config needed)
 - **MultiSend Contract**: The script uses MultiSendCallOnly (0x9641d764fc13c8B624c04430C7356C1C7C8102e2) for batch transactions
+- **🆕 USE_QUEUE_NONCE**: Set to `true` to append transactions to the queue instead of overwriting existing ones
 
 ### 2. Edit CONFIG in Code
 
@@ -138,7 +149,9 @@ const CONFIG = {
     RPC_URL: 'https://polygon-rpc.com',
     // MultiSendCallOnly 1.4.1 contract - uses CALL instead of DELEGATE_CALL
     // Required for Safes with delegate calls disabled
-    MULTI_SEND_CALL_ONLY_ADDRESS: '0x9641d764fc13c8B624c04430C7356C1C7C8102e2'
+    MULTI_SEND_CALL_ONLY_ADDRESS: '0x9641d764fc13c8B624c04430C7356C1C7C8102e2',
+    // Nonce strategy
+    USE_QUEUE_NONCE: true  // false = use current nonce, true = append to queue
 };
 ```
 
@@ -196,15 +209,33 @@ Transaction JSON → proposeSafeTransactions.js → Safe SDK → Safe API → Sa
 
 ### Nonce Management 🔢
 
-When proposing **multiple batches**, the script automatically:
-- Gets the current Safe nonce (e.g., 10)
-- Assigns sequential nonces to each batch:
-  - Batch 1 → nonce 10
-  - Batch 2 → nonce 11
-  - Batch 3 → nonce 12
-  - etc.
+The script now supports **two nonce strategies**:
 
-This prevents **nonce conflicts** where multiple transactions would have the same nonce and conflict with each other. Each batch gets its own unique nonce, ensuring they execute in the correct order.
+#### 1. Current Nonce Mode (Default: `USE_QUEUE_NONCE=false`)
+- Gets the current Safe nonce (next nonce to be executed)
+- Example: If current nonce is 10, assigns nonces 10, 11, 12...
+- **⚠️ Warning**: May overwrite pending transactions in the queue
+- **Use when**: You want to replace/overwrite existing pending transactions
+
+#### 2. Queue Nonce Mode (Recommended: `USE_QUEUE_NONCE=true`) 🆕
+- Checks for pending transactions in the queue
+- Finds the highest pending nonce and adds 1
+- Example: If queue has nonces 10, 11, 12, starts at nonce 13
+- **✅ Benefit**: Appends to queue without overwriting existing transactions
+- **Use when**: You have transactions already pending and want to add more
+
+**How it works for multiple batches:**
+```
+Example with USE_QUEUE_NONCE=true:
+- Current nonce: 5
+- Pending queue: nonces 5, 6, 7
+- Script starts at: nonce 8
+- Batch 1 → nonce 8
+- Batch 2 → nonce 9
+- Batch 3 → nonce 10
+```
+
+This prevents **nonce conflicts** where multiple transactions would have the same nonce. Each batch gets its own unique nonce, ensuring they execute in the correct order without overwriting existing pending transactions.
 
 ## How MultiSend Works
 

@@ -28,7 +28,11 @@ node proposeSafeTransactions.js single ../X23/pushPayment/transactions_batch1.js
 ### Alternative: Using Environment Variable (without .env file)
 
 ```bash
+# Default behavior (uses current nonce)
 PRIVATE_KEY=0xYourPrivateKey node proposeSafeTransactions.js batch ../X23/pushPayment
+
+# 🆕 Use queue nonce to append to existing queue (recommended)
+PRIVATE_KEY=0xYourPrivateKey USE_QUEUE_NONCE=true node proposeSafeTransactions.js batch ../X23/pushPayment
 ```
 
 ## 🔧 Configuration
@@ -44,6 +48,11 @@ PRIVATE_KEY=0x1234567890abcdef...
 # Optional overrides (usually not needed)
 CHAIN_ID=137
 RPC_URL=https://polygon-rpc.com
+
+# 🆕 NEW: Nonce Configuration
+# USE_QUEUE_NONCE=false (default) - Uses current nonce, may overwrite pending transactions
+# USE_QUEUE_NONCE=true (recommended) - Appends to queue without overwriting
+USE_QUEUE_NONCE=true
 ```
 
 **Note:** Safe address is automatically extracted from transaction files, no need to configure it.
@@ -102,6 +111,7 @@ VestingReset/
 ## 💡 Tips
 
 - Use **batch mode** to propose multiple transactions at once
+- **🆕 USE_QUEUE_NONCE=true**: Set this to append transactions to your queue without overwriting existing pending transactions
 - **Automatic nonce management**: Each batch gets a unique, sequential nonce (no conflicts!)
 - The script includes 2-second delays between batches to avoid rate limiting
 - Check the console output for transaction hashes, nonces, and links
