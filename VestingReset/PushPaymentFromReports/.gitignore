@@ -1,0 +1,10 @@
+node_modules/
+.env
+*.log
+.DS_Store
+
+# Output directories
+*/pushPayment/
+*/addressToFilter*.json
+claims_report.json
+

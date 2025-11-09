@@ -1,0 +1,30 @@
+{
+    "name": "push-payment-from-reports",
+    "version": "1.0.0",
+    "description": "Generate pushPayment transactions from reports with claim checking",
+    "type": "module",
+    "main": "pushPaymentTransactionGenerator.js",
+    "scripts": {
+        "test": "node test.js",
+        "generate-claims-report": "node generateClaimsReport.js",
+        "generate-with-deduction": "node generatePushPaymentWithClaimDeduction.js",
+        "generate": "node pushPaymentTransactionGenerator.js",
+        "check-claims": "node checkClaimedAmountsViaAPI.js",
+        "generate-with-claims": "node pushPaymentWithClaimCheckAPI.js"
+    },
+    "keywords": [
+        "vesting",
+        "payments",
+        "safe",
+        "gnosis-safe",
+        "ethereum",
+        "polygon",
+        "pushPayment"
+    ],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "ethers": "^6.11.1",
+        "dotenv": "^16.3.1"
+    }
+}
