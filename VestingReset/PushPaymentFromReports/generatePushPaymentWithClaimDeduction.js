@@ -8,45 +8,48 @@ const CONFIG = {
     // Can be a single file or an array of files
     transactionFileNames: [
         "5.json",
-        // Add more transaction files here if needed
-        // "1.json",
-        // "2.json",
-        // "3.json",
-        // "4.json",
+        "1.json",
+        "2.json",
+        "3.json",
+        "4.json",
     ],
     claimsReportFileName: "claims_report.json",
-    onlyUsersWithClaims: false // Set to true to only process users who have claimed
+    onlyUsersWithClaims: false, // Set to true to only process users who have claimed
+
+    // New stream configuration
+    newStreamStartTimestamp: 1762736400, // Set to 0 to use current time, or specify Unix timestamp
+    // When 0: Uses Math.floor(Date.now() / 1000)
+    // Example: 1760371200 for Oct 13, 2025 16:00:00 GMT
 };
 
 const FUNCTION_SELECTORS = {
     pushPayment: "0x8028b82f",
 };
 
+const ONE_SECOND = 1;
+const ONE_WEEK = 7 * 24 * 60 * 60; // 7 days in seconds
+
 // ============================================================================
 // FILE OPERATIONS
 // ============================================================================
 
 /**
- * Reads a single transaction file containing user payment data
+ * Reads a single transaction file
  */
 function readTransactionFile(filename) {
     try {
         const data = fs.readFileSync(filename, 'utf8');
-        const transactionData = JSON.parse(data);
-        console.log(`   ✅ ${filename}: ${transactionData.transactions?.readable?.length || 0} transactions`);
-        return transactionData;
+        const fileData = JSON.parse(data);
+        console.log(`   ✅ ${filename}: ${fileData.transactions?.readable?.length || 0} transactions`);
+        return fileData;
     } catch (error) {
-        if (error.code === 'ENOENT') {
-            console.log(`   ⚠️  Not found: ${filename}`);
-            return null;
-        }
-        console.error(`   ❌ Error reading ${filename}:`, error.message);
-        throw error;
+        console.error(`❌ Error reading ${filename}:`, error.message);
+        return null;
     }
 }
 
 /**
- * Reads multiple transaction files and merges them
+ * Reads multiple transaction files
  */
 function readTransactionFiles(fileNames) {
     console.log(`\n📄 Reading transaction files...`);
@@ -97,44 +100,33 @@ function readClaimsReport(filename) {
     }
 }
 
+// ============================================================================
+// DATA EXTRACTION
+// ============================================================================
+
 /**
- * Extract user data from transactions
+ * Extract user data from transactions and merge duplicates within the same file
  */
 function getUserDataFromTransactions(transactions) {
-    const userData = [];
+    const userMap = new Map();
+
     for (const transaction of transactions) {
         for (const tx of transaction) {
             if (tx.functionSignature === "pushPayment(address,address,uint256,uint256,uint256,uint256)") {
-                userData.push({
-                    address: tx.inputValues[0],
-                    amount: tx.inputValues[2],
-                });
-            }
-        }
-    }
-    return userData;
-}
+                const userAddress = tx.inputValues[0].toLowerCase();
+                const amount = BigInt(tx.inputValues[2]);
 
-/**
- * Extract and merge user data from multiple transaction files
- */
-function getUserDataFromMultipleFiles(filesDataArray) {
-    const userMap = new Map();
-
-    for (const fileData of filesDataArray) {
-        const users = getUserDataFromTransactions(fileData.transactions.readable);
-
-        // Merge users, summing amounts for duplicates
-        for (const user of users) {
-            const userKey = user.address.toLowerCase();
-            if (userMap.has(userKey)) {
-                const existing = userMap.get(userKey);
-                existing.amount = (BigInt(existing.amount) + BigInt(user.amount)).toString();
-            } else {
-                userMap.set(userKey, {
-                    address: user.address,
-                    amount: user.amount
-                });
+                if (userMap.has(userAddress)) {
+                    // User already exists, sum the amounts
+                    const existing = userMap.get(userAddress);
+                    existing.amount = (BigInt(existing.amount) + amount).toString();
+                } else {
+                    // New user
+                    userMap.set(userAddress, {
+                        address: tx.inputValues[0], // Keep original checksum
+                        amount: amount.toString(),
+                    });
+                }
             }
         }
     }
@@ -143,31 +135,163 @@ function getUserDataFromMultipleFiles(filesDataArray) {
 }
 
 /**
+ * Extract user data with vesting information from a single file
+ */
+function getUserDataWithVestingFromFile(fileData) {
+    const users = getUserDataFromTransactions(fileData.transactions.readable);
+
+    // Get timing from first transaction
+    let originalStart, originalCliff, originalEnd;
+    if (fileData.transactions.readable && fileData.transactions.readable.length > 0) {
+        const firstTransaction = fileData.transactions.readable[0];
+        if (firstTransaction && firstTransaction.length > 0) {
+            const firstTx = firstTransaction.find(tx =>
+                tx.functionSignature === "pushPayment(address,address,uint256,uint256,uint256,uint256)"
+            );
+            if (firstTx && firstTx.inputValues && firstTx.inputValues.length >= 6) {
+                originalStart = parseInt(firstTx.inputValues[3]);
+                originalCliff = parseInt(firstTx.inputValues[4]);
+                originalEnd = parseInt(firstTx.inputValues[5]);
+            }
+        }
+    }
+
+    const transactionCount = fileData.transactions.readable.reduce((sum, txArray) => sum + txArray.length, 0);
+    if (users.length < transactionCount) {
+        const merged = transactionCount - users.length;
+        console.log(`   📊 ${transactionCount} transactions → ${users.length} unique users (${merged} duplicates merged)`);
+    }
+
+    return {
+        users,
+        timing: { originalStart, originalCliff, originalEnd }
+    };
+}
+
+// ============================================================================
+// VESTING CALCULATIONS
+// ============================================================================
+
+/**
+ * Calculate how much would be releasable at a given timestamp
+ */
+function calculateReleasableAmount(totalAmount, vestingStart, vestingEnd, currentTime) {
+    const total = BigInt(totalAmount);
+    const start = BigInt(vestingStart);
+    const end = BigInt(vestingEnd);
+    const now = BigInt(currentTime);
+
+    // If before vesting starts, nothing is releasable
+    if (now < start) {
+        return BigInt(0);
+    }
+
+    // If after vesting ends, everything is releasable
+    if (now >= end) {
+        return total;
+    }
+
+    // Linear vesting: releasable = total * (now - start) / (end - start)
+    const elapsed = now - start;
+    const duration = end - start;
+
+    if (duration === BigInt(0)) {
+        return total;
+    }
+
+    return (total * elapsed) / duration;
+}
+
+/**
+ * Merge users across all files, calculating total releasable amount from all streams
+ */
+function mergeUsersAcrossFiles(filesDataArray, newStreamStart) {
+    const userMap = new Map();
+    let filesProcessed = 0;
+
+    console.log(`\n📊 Merging users across all files...`);
+
+    for (let i = 0; i < filesDataArray.length; i++) {
+        const fileData = filesDataArray[i];
+        const fileName = Array.isArray(CONFIG.transactionFileNames) ?
+            CONFIG.transactionFileNames[i] :
+            CONFIG.transactionFileNames;
+
+        const { users, timing } = getUserDataWithVestingFromFile(fileData);
+
+        if (!timing.originalStart || !timing.originalEnd) {
+            console.log(`   ⚠️  Skipping ${fileName}: Failed to extract timing`);
+            continue;
+        }
+
+        const actualVestingStart = timing.originalStart + timing.originalCliff;
+        filesProcessed++;
+
+        console.log(`   📄 ${fileName}: ${users.length} users, vesting ${new Date(actualVestingStart * 1000).toISOString().split('T')[0]} to ${new Date(timing.originalEnd * 1000).toISOString().split('T')[0]}`);
+
+        // For each user in this file, add their releasable and unvested amounts
+        for (const user of users) {
+            const userKey = user.address.toLowerCase();
+            const amount = BigInt(user.amount);
+
+            // Calculate releasable and unvested for THIS stream
+            const releasable = calculateReleasableAmount(
+                amount,
+                actualVestingStart,
+                timing.originalEnd,
+                newStreamStart
+            );
+            const unvested = amount - releasable;
+
+            if (userMap.has(userKey)) {
+                // User exists in multiple files - sum their amounts
+                const existing = userMap.get(userKey);
+                existing.totalAmount = (BigInt(existing.totalAmount) + amount).toString();
+                existing.totalReleasable = (BigInt(existing.totalReleasable) + releasable).toString();
+                existing.totalUnvested = (BigInt(existing.totalUnvested) + unvested).toString();
+                existing.streamCount++;
+            } else {
+                // New user
+                userMap.set(userKey, {
+                    address: user.address,
+                    totalAmount: amount.toString(),
+                    totalReleasable: releasable.toString(),
+                    totalUnvested: unvested.toString(),
+                    streamCount: 1
+                });
+            }
+        }
+    }
+
+    const finalUsers = Array.from(userMap.values());
+    const usersWithMultipleStreams = finalUsers.filter(u => u.streamCount > 1).length;
+
+    console.log(`\n✅ Merge Complete:`);
+    console.log(`   Files processed: ${filesProcessed}`);
+    console.log(`   Total unique users: ${finalUsers.length}`);
+    console.log(`   Users with multiple streams: ${usersWithMultipleStreams}`);
+
+    return finalUsers;
+}
+
+/**
  * Build a map of claimed amounts from the claims report
  */
 function buildClaimedAmountsMap(claimsReport, tokenAddress) {
     const claimedMap = new Map();
+    const tokenAddressLower = tokenAddress.toLowerCase();
 
-    if (!claimsReport || !claimsReport.users) {
-        return claimedMap;
-    }
+    for (const userEntry of claimsReport.users) {
+        const userAddressLower = userEntry.userAddress.toLowerCase();
 
-    const normalizedTokenAddress = tokenAddress.toLowerCase();
-
-    for (const user of claimsReport.users) {
-        const userAddress = user.userAddress.toLowerCase();
-
-        // Find the token in user's tokens
-        const tokenData = user.tokens.find(t =>
-            t.tokenAddress.toLowerCase() === normalizedTokenAddress
-        );
-
-        if (tokenData && BigInt(tokenData.totalClaimed) > BigInt(0)) {
-            claimedMap.set(userAddress, {
-                address: user.userAddress,
-                claimedAmount: tokenData.totalClaimed,
-                claimCount: tokenData.claimCount
-            });
+        for (const tokenEntry of userEntry.tokens) {
+            if (tokenEntry.tokenAddress.toLowerCase() === tokenAddressLower) {
+                claimedMap.set(userAddressLower, {
+                    claimedAmount: tokenEntry.totalClaimed,
+                    claimCount: tokenEntry.claimCount
+                });
+                break;
+            }
         }
     }
 
@@ -179,84 +303,146 @@ function buildClaimedAmountsMap(claimsReport, tokenAddress) {
 // ============================================================================
 
 /**
- * Build push payment transactions with claim deductions
+ * Build push payment transactions with two streams using pre-calculated totals
  */
-function buildTransactions(toAddress, userData, tokenAddress, start, cliff, end, claimedMap, onlyUsersWithClaims) {
+function buildTransactions(toAddress, userData, tokenAddress, newStreamStart, claimedMap, onlyUsersWithClaims) {
     const transactions = [];
     let usersProcessed = 0;
     let usersWithClaims = 0;
     let usersSkipped = 0;
     let totalDeducted = BigInt(0);
+    let totalImmediateVesting = BigInt(0);
+    let totalWeeklyVesting = BigInt(0);
 
     // Checksum addresses to ensure proper format
     const checksummedToAddress = ethers.getAddress(toAddress);
     const checksummedTokenAddress = ethers.getAddress(tokenAddress);
 
-    console.log('\n📊 Processing users...\n');
+    console.log('\n📊 Processing merged users and applying claim deductions...\n');
+    console.log(`⏰ New streams start: ${new Date(newStreamStart * 1000).toISOString()}\n`);
 
     for (const user of userData) {
         const checksummedUserAddress = ethers.getAddress(user.address);
         const userAddressLower = user.address.toLowerCase();
 
-        let amountToPush = user.amount;
+        const totalAmount = BigInt(user.totalAmount);
+        let totalReleasable = BigInt(user.totalReleasable);
+        let totalUnvested = BigInt(user.totalUnvested);
         let shouldInclude = !onlyUsersWithClaims;
 
-        // Check if user has claimed
-        const claimData = claimedMap.get(userAddressLower);
+        // Check if user has claimed and deduct from releasable
+        let claimedAmount = BigInt(0);
+        let immediateAmount = totalReleasable;
 
+        const claimData = claimedMap.get(userAddressLower);
         if (claimData) {
             usersWithClaims++;
-            const claimedAmount = BigInt(claimData.claimedAmount);
-            const originalAmount = BigInt(user.amount);
+            claimedAmount = BigInt(claimData.claimedAmount);
 
-            console.log(`💰 ${checksummedUserAddress}:`);
-            console.log(`   Original amount: ${ethers.formatEther(originalAmount)} tokens`);
-            console.log(`   Claimed amount: ${ethers.formatEther(claimedAmount)} tokens (${claimData.claimCount} claims)`);
+            // Deduct claimed from releasable first
+            immediateAmount = totalReleasable - claimedAmount;
 
-            amountToPush = (originalAmount - claimedAmount).toString();
+            // If user claimed more than releasable, they over-claimed
+            // Set immediate to 0 and deduct excess from unvested
+            if (immediateAmount < BigInt(0)) {
+                const excessClaimed = claimedAmount - totalReleasable;
+                totalUnvested = totalUnvested - excessClaimed;
+                immediateAmount = BigInt(0);
+
+                // Ensure unvested doesn't go negative
+                if (totalUnvested < BigInt(0)) {
+                    totalUnvested = BigInt(0);
+                }
+            }
+
             totalDeducted += claimedAmount;
-
-            console.log(`   → New amount: ${ethers.formatEther(amountToPush)} tokens\n`);
 
             if (onlyUsersWithClaims) {
                 shouldInclude = true;
             }
+
+            console.log(`💰 ${checksummedUserAddress}${user.streamCount > 1 ? ` (${user.streamCount} streams merged)` : ''}:`);
+            console.log(`   Total amount: ${ethers.formatEther(totalAmount)} tokens`);
+            console.log(`   Releasable at new start: ${ethers.formatEther(totalReleasable)} tokens`);
+            console.log(`   Already claimed: ${ethers.formatEther(claimedAmount)} tokens`);
+            if (claimedAmount > totalReleasable) {
+                console.log(`   ⚠️  Over-claimed by: ${ethers.formatEther(claimedAmount - totalReleasable)} tokens`);
+            }
+            console.log(`   → Immediate vesting (1s): ${ethers.formatEther(immediateAmount)} tokens`);
+            console.log(`   → Weekly vesting (7d): ${ethers.formatEther(totalUnvested)} tokens\n`);
         }
 
-        // Include user if they should be included and have a positive amount
-        if (shouldInclude && BigInt(amountToPush) > BigInt(0)) {
-            transactions.push({
-                to: checksummedToAddress,
-                value: "0",
-                data: FUNCTION_SELECTORS.pushPayment + ethers.AbiCoder.defaultAbiCoder().encode(
-                    ["address", "address", "uint256", "uint256", "uint256", "uint256"], [checksummedUserAddress, checksummedTokenAddress, amountToPush, start, cliff, end]
-                ).slice(2),
-                contractMethod: "pushPayment(address,address,uint256,uint256,uint256,uint256)",
-                contractInputsValues: [
-                    checksummedUserAddress,
-                    checksummedTokenAddress,
-                    amountToPush,
-                    start.toString(),
-                    cliff.toString(),
-                    end.toString()
-                ]
-            });
-            usersProcessed++;
-        } else if (BigInt(amountToPush) <= BigInt(0)) {
+        // Skip if both amounts are zero or negative
+        if (immediateAmount <= BigInt(0) && totalUnvested <= BigInt(0)) {
             usersSkipped++;
-            console.log(`⏭️  Skipping ${checksummedUserAddress}: Fully claimed (${ethers.formatEther(user.amount)} tokens)\n`);
+            console.log(`⏭️  Skipping ${checksummedUserAddress}: Fully claimed\n`);
+            continue;
+        }
+
+        // Include user if they should be included
+        if (shouldInclude) {
+            // Transaction 1: Immediate vesting (1 second) for claimable amount
+            if (immediateAmount > BigInt(0)) {
+                const endTimeImmediate = newStreamStart + ONE_SECOND;
+
+                transactions.push({
+                    to: checksummedToAddress,
+                    value: "0",
+                    data: FUNCTION_SELECTORS.pushPayment + ethers.AbiCoder.defaultAbiCoder().encode(
+                        ["address", "address", "uint256", "uint256", "uint256", "uint256"], [checksummedUserAddress, checksummedTokenAddress, immediateAmount.toString(), newStreamStart, 0, endTimeImmediate]
+                    ).slice(2),
+                    contractMethod: "pushPayment(address,address,uint256,uint256,uint256,uint256)",
+                    contractInputsValues: [
+                        checksummedUserAddress,
+                        checksummedTokenAddress,
+                        immediateAmount.toString(),
+                        newStreamStart.toString(),
+                        "0",
+                        endTimeImmediate.toString()
+                    ]
+                });
+                totalImmediateVesting += immediateAmount;
+            }
+
+            // Transaction 2: Week-long vesting for remaining unvested amount
+            if (totalUnvested > BigInt(0)) {
+                const endTimeWeekly = newStreamStart + ONE_WEEK;
+
+                transactions.push({
+                    to: checksummedToAddress,
+                    value: "0",
+                    data: FUNCTION_SELECTORS.pushPayment + ethers.AbiCoder.defaultAbiCoder().encode(
+                        ["address", "address", "uint256", "uint256", "uint256", "uint256"], [checksummedUserAddress, checksummedTokenAddress, totalUnvested.toString(), newStreamStart, 0, endTimeWeekly]
+                    ).slice(2),
+                    contractMethod: "pushPayment(address,address,uint256,uint256,uint256,uint256)",
+                    contractInputsValues: [
+                        checksummedUserAddress,
+                        checksummedTokenAddress,
+                        totalUnvested.toString(),
+                        newStreamStart.toString(),
+                        "0",
+                        endTimeWeekly.toString()
+                    ]
+                });
+                totalWeeklyVesting += totalUnvested;
+            }
+
+            usersProcessed++;
         }
     }
 
     console.log('='.repeat(80));
     console.log('📈 Processing Summary:');
     console.log('='.repeat(80));
-    console.log(`Total users in file: ${userData.length}`);
+    console.log(`Total users in files: ${userData.length}`);
     console.log(`Users with claims: ${usersWithClaims}`);
     console.log(`Users without claims: ${userData.length - usersWithClaims}`);
-    console.log(`Users included in output: ${usersProcessed}`);
+    console.log(`Users processed: ${usersProcessed}`);
     console.log(`Users skipped (fully claimed): ${usersSkipped}`);
-    console.log(`Total amount deducted: ${ethers.formatEther(totalDeducted)} tokens\n`);
+    console.log(`Total claimed amount deducted: ${ethers.formatEther(totalDeducted)} tokens`);
+    console.log(`Total immediate vesting (1s): ${ethers.formatEther(totalImmediateVesting)} tokens`);
+    console.log(`Total weekly vesting (7d): ${ethers.formatEther(totalWeeklyVesting)} tokens`);
+    console.log(`Total tokens in new streams: ${ethers.formatEther(totalImmediateVesting + totalWeeklyVesting)} tokens\n`);
 
     return transactions;
 }
@@ -264,7 +450,7 @@ function buildTransactions(toAddress, userData, tokenAddress, start, cliff, end,
 /**
  * Generate transaction JSON files in batches
  */
-function generateTransactionJson(safe, projectName, client, userData, abcTokenAddress, start, cliff, end, claimedMap, onlyUsersWithClaims) {
+function generateTransactionJsonSimple(safe, projectName, transactions) {
     const batchSize = 25;
     const currentTimestamp = Date.now();
 
@@ -285,31 +471,10 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
         console.log(`📁 Created pushPayment folder: ${pushPaymentFolder}`);
     }
 
-    // Build all transactions
-    const transactions = buildTransactions(
-        client,
-        userData,
-        abcTokenAddress,
-        start,
-        cliff,
-        end,
-        claimedMap,
-        onlyUsersWithClaims
-    );
-
-    if (transactions.length === 0) {
-        console.log('⚠️  No transactions to generate. All users were skipped.');
-        return;
-    }
-
     // Split into batches
     const totalBatches = Math.ceil(transactions.length / batchSize);
 
-    console.log('='.repeat(80));
-    console.log('📝 Generating Transaction Files');
-    console.log('='.repeat(80));
-    console.log(`Total transactions: ${transactions.length}`);
-    console.log(`Batch size: ${batchSize}`);
+    console.log(`Batch size: 25`);
     console.log(`Total batches: ${totalBatches}\n`);
 
     for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
@@ -322,8 +487,8 @@ function generateTransactionJson(safe, projectName, client, userData, abcTokenAd
             chainId: "137", // Polygon Mainnet
             createdAt: currentTimestamp,
             meta: {
-                name: `[PUSH-PAYMENTS]-[${projectName}]-[WITH-DEDUCTION]-[TX-${batchIndex}]`,
-                description: `Batch ${batchIndex + 1} for ${projectName} - With claim deductions`,
+                name: `[PUSH-PAYMENTS]-[${projectName}]-[DUAL-STREAM]-[TX-${batchIndex}]`,
+                description: `Batch ${batchIndex + 1} for ${projectName} - Immediate (1s) + Weekly (7d) vestings with claim deductions`,
                 txBuilderVersion: "",
                 createdFromSafeAddress: checksummedSafeAddress,
                 createdFromOwnerAddress: "",
@@ -354,26 +519,26 @@ async function main() {
 
     // Read transaction files
     const filesDataArray = readTransactionFiles(CONFIG.transactionFileNames);
-    const filesData = filesDataArray[0]; // Use first file for configuration
 
-    // Extract configuration from transaction file
-    let projectName = filesData.projectName;
-    const paymentRouterAddress = filesData.queries.addresses.paymentRouter;
-    const fundingPotMSAddress = filesData.inputs.projectConfig.SAFE;
-    const abcTokenAddress = filesData.queries.addresses.issuanceToken;
+    // Use FIRST file for configuration
+    const firstFileData = filesDataArray[0];
+    let projectName = firstFileData.projectName;
+    const paymentRouterAddress = firstFileData.queries.addresses.paymentRouter;
+    const fundingPotMSAddress = firstFileData.inputs.projectConfig.SAFE;
+    const abcTokenAddress = firstFileData.queries.addresses.issuanceToken;
 
     // Clean up project name
     if (projectName) {
         const originalName = projectName;
         projectName = projectName.replace(/_S2$/i, '').replace(/_+$/, '');
         if (originalName !== projectName) {
-            console.log(`📝 Cleaned project name: ${originalName} → ${projectName}`);
+            console.log(`\n📝 Cleaned project name: ${originalName} → ${projectName}`);
         }
     }
 
     // Validate extracted data
     if (!projectName || !paymentRouterAddress || !fundingPotMSAddress || !abcTokenAddress) {
-        console.error('❌ Error: Failed to extract all required configuration from transaction file');
+        console.error('\n❌ Error: Failed to extract all required configuration from first transaction file');
         console.error('Missing:', {
             projectName: !!projectName,
             paymentRouterAddress: !!paymentRouterAddress,
@@ -383,49 +548,24 @@ async function main() {
         process.exit(1);
     }
 
-    console.log('\n✅ Project Configuration:');
+    console.log('\n✅ Project Configuration (from first file):');
     console.log(`   Project Name: ${projectName}`);
     console.log(`   Safe Address: ${fundingPotMSAddress}`);
     console.log(`   Payment Router: ${paymentRouterAddress}`);
     console.log(`   Token Address: ${abcTokenAddress}`);
 
-    // Extract timing data from first file
-    let originalStart, originalCliff, originalEnd;
-    if (filesData.transactions.readable && filesData.transactions.readable.length > 0) {
-        const firstTransaction = filesData.transactions.readable[0];
-        if (firstTransaction && firstTransaction.length > 0) {
-            const firstTx = firstTransaction.find(tx =>
-                tx.functionSignature === "pushPayment(address,address,uint256,uint256,uint256,uint256)"
-            );
-            if (firstTx && firstTx.inputValues && firstTx.inputValues.length >= 6) {
-                originalStart = parseInt(firstTx.inputValues[3]);
-                originalCliff = parseInt(firstTx.inputValues[4]);
-                originalEnd = parseInt(firstTx.inputValues[5]);
-            }
-        }
-    }
+    // Calculate new stream start time
+    const newStreamStart = CONFIG.newStreamStartTimestamp === 0 ?
+        Math.floor(Date.now() / 1000) :
+        CONFIG.newStreamStartTimestamp;
 
-    if (!originalStart || !originalEnd) {
-        console.error('❌ Error: Failed to extract timing data from transaction file');
-        process.exit(1);
-    }
+    console.log(`\n⏰ New Streams Configuration:`);
+    console.log(`   Start: ${newStreamStart} (${new Date(newStreamStart * 1000).toISOString()})`);
+    console.log(`   → Immediate Vesting: 1 second duration`);
+    console.log(`   → Weekly Vesting: 7 days duration`);
 
-    // Calculate new timing
-    const start = originalStart + originalCliff;
-    const cliff = 0;
-    const end = originalEnd;
-
-    console.log(`\n⏰ Timing Configuration:`);
-    console.log(`   Original Start: ${originalStart} (${new Date(originalStart * 1000).toISOString()})`);
-    console.log(`   Original Cliff: ${originalCliff} seconds (${Math.floor(originalCliff / 86400)} days)`);
-    console.log(`   Original End: ${originalEnd} (${new Date(originalEnd * 1000).toISOString()})`);
-    console.log(`   → New Start: ${start} (${new Date(start * 1000).toISOString()})`);
-    console.log(`   → New Cliff: ${cliff}`);
-    console.log(`   → New End: ${end} (${new Date(end * 1000).toISOString()})`);
-
-    // Extract and merge user data from all files
-    const userData = getUserDataFromMultipleFiles(filesDataArray);
-    console.log(`\n👥 Users Found: ${userData.length} (merged from ${filesDataArray.length} file(s))`);
+    // Merge users across all files, calculating total releasable from all streams
+    const mergedUsers = mergeUsersAcrossFiles(filesDataArray, newStreamStart);
 
     // Read claims report
     console.log(`\n📊 Reading claims report: ${CONFIG.claimsReportFileName}`);
@@ -435,29 +575,38 @@ async function main() {
     const claimedMap = claimsReport ? buildClaimedAmountsMap(claimsReport, abcTokenAddress) : new Map();
 
     if (claimedMap.size > 0) {
-        console.log(`\n✅ Found ${claimedMap.size} users with claims for this token`);
+        console.log(`✅ Found ${claimedMap.size} users with claims for this token`);
     } else {
-        console.log(`\n⚠️  No claims found - will use original amounts for all users`);
+        console.log(`⚠️  No claims found - will use calculated releasable amounts without deductions`);
     }
 
     // Generate transactions
     console.log('\n' + '='.repeat(80));
-    console.log('🏗️  Generating Transactions');
+    console.log('🏗️  Generating Dual-Stream Transactions');
     console.log('='.repeat(80));
-    console.log(`Mode: ${CONFIG.onlyUsersWithClaims ? 'Only users with claims' : 'All users (with deductions)'}`);
+    console.log(`Mode: ${CONFIG.onlyUsersWithClaims ? 'Only users with claims' : 'All users'}`);
+    console.log(`Strategy: Merge all streams, one pair per user (immediate + weekly)`);
 
-    generateTransactionJson(
-        fundingPotMSAddress,
-        projectName,
+    const transactions = buildTransactions(
         paymentRouterAddress,
-        userData,
+        mergedUsers,
         abcTokenAddress,
-        start,
-        cliff,
-        end,
+        newStreamStart,
         claimedMap,
         CONFIG.onlyUsersWithClaims
     );
+
+    if (transactions.length === 0) {
+        console.log('\n⚠️  No transactions to generate. All users were skipped.');
+        return;
+    }
+
+    // Generate output files
+    console.log('\n' + '='.repeat(80));
+    console.log('📝 Generating Transaction Files');
+    console.log('='.repeat(80));
+
+    generateTransactionJsonSimple(fundingPotMSAddress, projectName, transactions);
 
     console.log('\n✅ Done!');
     console.log('='.repeat(80));

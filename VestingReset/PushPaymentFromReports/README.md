@@ -40,10 +40,13 @@ npm run generate-with-claims
 - **Run this once**, then reuse the report
 
 #### 2. `npm run generate-with-deduction`  
-**Step 2**: Generates push payment transactions using the claims report.
-- Reads `1.json` for user payment data
+**Step 2**: Generates push payment transactions with **dual streams** using the claims report.
+- Reads transaction files for user payment data
 - Reads `claims_report.json` for claimed amounts
-- Deducts claimed amounts from payments
+- **Creates TWO streams per user:**
+  - **Immediate (1s)**: For already-vested tokens minus claims
+  - **Weekly (7d)**: For remaining unvested tokens
+- Handles over-claims automatically
 - Outputs transaction batches to `{projectName}/pushPayment/`
 - **Fast** - no API calls, just file processing
 
@@ -88,9 +91,9 @@ Test script that analyzes 10 recent claim transactions to verify detection logic
 
 ## Configuration
 
-### Multiple Transaction Files
+### Dual-Stream Generation with Claim Deduction
 
-Edit `generatePushPaymentWithClaimDeduction.js` to process multiple transaction files:
+Edit `generatePushPaymentWithClaimDeduction.js`:
 
 ```javascript
 const CONFIG = {
@@ -101,17 +104,51 @@ const CONFIG = {
         "3.json",
     ],
     claimsReportFileName: "claims_report.json",
-    onlyUsersWithClaims: false  // false = all users, true = only users who claimed
+    onlyUsersWithClaims: false,  // false = all users, true = only users who claimed
+    
+    // New stream start time
+    newStreamStartTimestamp: 0,  // 0 = now, or specify Unix timestamp
+    // Example: 1760371200 for Oct 13, 2025 16:00:00 GMT
 };
 ```
 
 **Features:**
-- Process multiple transaction files in one run
-- Automatically merges duplicate users and sums their amounts
-- Uses configuration (Safe, payment router, token) from the first file
-- All files should have the same projectName and configuration
+- 🎯 **Dual-Stream**: Creates two vestings per user (immediate + weekly)
+- 📊 **Smart Calculation**: Calculates releasable amount from ALL streams combined
+- 💰 **Claim Deduction**: Deducts already-claimed tokens from total releasable
+- ⚠️  **Over-Claim Handling**: Handles cases where users claimed more than vested
+- 📁 **Multiple Files**: Process multiple transaction files in one run
+- 🔄 **Cross-File Merging**: Merges users across ALL files, summing their streams
+- 🎯 **One Pair Per User**: Each unique user gets ONE pair of streams (immediate + weekly)
 
-📖 **See [MULTIPLE_FILES_EXAMPLE.md](./MULTIPLE_FILES_EXAMPLE.md) for detailed examples and use cases**
+### How It Works
+
+**Step 1: Merge Users Across ALL Files**
+1. For each file, extract timing (`start`, `cliff`, `end`)
+2. Calculate actual vesting start: `originalStart + originalCliff`
+3. For each user in the file, calculate:
+   - Releasable: `totalAmount * (newStart - actualStart) / (end - actualStart)`
+   - Unvested: `totalAmount - releasable`
+4. If user appears in multiple files, SUM their amounts:
+   - `totalAmount = sum of all stream amounts`
+   - `totalReleasable = sum of all releasable amounts`
+   - `totalUnvested = sum of all unvested amounts`
+
+**Step 2: Apply Claim Deductions**
+1. Deduct claimed from releasable: `immediateAmount = totalReleasable - claimed`
+2. If over-claimed: deduct excess from unvested
+3. Skip users who are fully claimed
+
+**Step 3: Generate Dual Streams**
+- Stream 1: Immediate (1s) for `immediateAmount`
+- Stream 2: Weekly (7d) for `totalUnvested`
+
+⚠️ **Important**: 
+- Uses **FIRST file only** for contract addresses (Safe, payment router, token)
+- **Merges users across ALL files** to calculate total vested/unvested
+- Each unique user gets **ONE pair** of streams (not multiple pairs)
+
+📖 **See [DUAL_STREAM_GUIDE.md](./DUAL_STREAM_GUIDE.md) for detailed examples and calculations**
 
 ### Legacy Script Configuration
 
