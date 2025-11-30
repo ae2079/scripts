@@ -16,8 +16,6 @@ const PAYMENT_PROCESSOR_ABI = [
 
 // Configuration
 const RPC_URL = process.env.RPC_URL || "https://polygon-rpc.com"; // Polygon Mainnet RPC (fallback to public RPC if not set)
-const paymentProcessorAddress = "0xD6F574062E948d6B7F07c693f1b4240aFeA41657";
-const paymentRouterAddress = "0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be"; // client address
 
 // Circuit Breaker Configuration
 const CIRCUIT_BREAKER_CONFIG = {
@@ -134,6 +132,45 @@ function readTransactionFile(filename) {
         return transactionData;
     } catch (error) {
         console.error(`❌ Error reading file ${filename}:`, error.message);
+        throw error;
+    }
+}
+
+function readTransactionFileIfExists(filename) {
+    try {
+        if (!fs.existsSync(filename)) {
+            console.log(`⚠️  File ${filename} does not exist, skipping...`);
+            return null;
+        }
+        return readTransactionFile(filename);
+    } catch (error) {
+        console.error(`❌ Error reading file ${filename}:`, error.message);
+        return null;
+    }
+}
+
+function extractMetadataFromTransactionFile(transactionData) {
+    try {
+        const projectName = transactionData.projectName;
+        const paymentRouterAddress = transactionData.queries ? transactionData.queries.addresses ? transactionData.queries.addresses.paymentRouter : null : null;
+        const paymentProcessorAddress = transactionData.queries ? transactionData.queries.addresses ? transactionData.queries.addresses.paymentProcessor : null : null;
+
+        if (!projectName || !paymentRouterAddress || !paymentProcessorAddress) {
+            throw new Error('Missing required metadata in transaction file');
+        }
+
+        console.log(`📋 Extracted metadata:`);
+        console.log(`   - Project Name: ${projectName}`);
+        console.log(`   - Payment Router: ${paymentRouterAddress}`);
+        console.log(`   - Payment Processor: ${paymentProcessorAddress}`);
+
+        return {
+            projectName,
+            paymentRouterAddress,
+            paymentProcessorAddress
+        };
+    } catch (error) {
+        console.error(`❌ Error extracting metadata:`, error.message);
         throw error;
     }
 }
@@ -258,7 +295,7 @@ async function fetchAllUserStreamData(projectName, userAddresses, client, paymen
 
     // Setup provider and contract
     const provider = new ethers.JsonRpcProvider(RPC_URL);
-    const contract = new ethers.Contract(paymentProcessorAddress, PAYMENT_PROCESSOR_ABI, provider);
+    const contract = new ethers.Contract(paymentProcessor, PAYMENT_PROCESSOR_ABI, provider);
 
     const allUserData = {};
     let successCount = 0;
@@ -333,44 +370,54 @@ async function fetchAllUserStreamData(projectName, userAddresses, client, paymen
 // Main execution
 async function main() {
     try {
-        const projectName = 'X23';
+        console.log('📖 Reading transaction files dynamically...\n');
 
-        console.log('📖 Reading transaction files...\n');
+        // Define possible transaction files to read
+        const transactionFiles = [
+            { filename: "1.json", label: "File 1" },
+            { filename: "2.json", label: "File 2" },
+            { filename: "3.json", label: "File 3" },
+            { filename: "4.json", label: "File 4" },
+            { filename: "5.json", label: "File 5" },
+        ];
 
-        // Read all transaction files
-        const filesData = readTransactionFile("4.json");
-        const qaccUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
+        const filesData = [];
+        const allUsersFromFiles = [];
+        let lastValidFile = null;
 
-        const filesDataEA1 = readTransactionFile("1.json");
-        const ea1Users = getUserAddressesFromTransactions(filesDataEA1.transactions.readable);
+        // Read all available transaction files
+        for (const fileConfig of transactionFiles) {
+            const data = readTransactionFileIfExists(fileConfig.filename);
+            if (data) {
+                filesData.push({...fileConfig, data });
+                lastValidFile = data;
 
-        const filesDataEA2 = readTransactionFile("2.json");
-        const ea2Users = getUserAddressesFromTransactions(filesDataEA2.transactions.readable);
+                // Extract users from this file
+                const users = getUserAddressesFromTransactions(data.transactions.readable);
+                allUsersFromFiles.push(...users);
+                console.log(`   - ${fileConfig.label} (${fileConfig.filename}): ${users.length} users`);
+            }
+        }
 
-        const filesDataEA3 = readTransactionFile("3.json");
-        const ea3Users = getUserAddressesFromTransactions(filesDataEA3.transactions.readable);
+        if (filesData.length === 0) {
+            throw new Error('No transaction files found! Please ensure at least one transaction file exists.');
+        }
 
-        const filesDataS2 = readTransactionFile("5.json");
-        const S2Users = getUserAddressesFromTransactions(filesDataS2.transactions.readable);
+        if (!lastValidFile) {
+            throw new Error('No valid transaction file found to extract metadata from!');
+        }
 
-        // const teamsVestings = [
-        //     "0x0D3edA53332b9fDf4d4e9FB4C1C940A80B16eD9D",
-        //     "0x01b9F17e97dFb2e25581690e048d4fF8d0b788f3",
-        //     "0xcE3848cDf3304CB71ef1615700EEe09E030559F9",
-        //     "0x346e969567224490C54B8C8DB783b8D22ADFD5d5",
-        //     "0x1a7ba55c069331a5079DF14CC8C2351589A0aCFA",
-        // ];
+        // Extract metadata from the last available transaction file
+        const lastFileName = filesData[filesData.length - 1].filename;
+        console.log(`\n📋 Extracting metadata from last transaction file (${lastFileName})...\n`);
+        const { projectName, paymentRouterAddress, paymentProcessorAddress } = extractMetadataFromTransactionFile(lastValidFile);
 
         // Get all unique users
-        const allUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users, ...S2Users, ...qaccUsers])];
+        const allUsers = [...new Set(allUsersFromFiles)];
 
-        console.log(`\n📊 Total unique users found: ${allUsers.length}`);
-        console.log(`   - QACC users: ${qaccUsers.length}`);
-        console.log(`   - EA1 users: ${ea1Users.length}`);
-        console.log(`   - EA2 users: ${ea2Users.length}`);
-        console.log(`   - EA3 users: ${ea3Users.length}`);
-        console.log(`   - S2 users: ${S2Users.length}`);
-        // console.log(`   - Team vestings: ${teamsVestings.length}`);
+        console.log(`\n📊 Summary:`);
+        console.log(`   - Total files read: ${filesData.length}`);
+        console.log(`   - Total unique users found: ${allUsers.length}`);
 
         // Fetch stream data for all users
         await fetchAllUserStreamData(
