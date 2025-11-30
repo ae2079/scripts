@@ -1,0 +1,71 @@
+{
+    "version": "1.0",
+    "chainId": "137",
+    "createdAt": 1764490422097,
+    "meta": {
+        "name": "[CLOSE-WORKFLOW]-[PROJECT-AKARUN]-[TX-0]",
+        "description": "Close workflow for AKARUN",
+        "txBuilderVersion": "",
+        "createdFromSafeAddress": "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e",
+        "createdFromOwnerAddress": "",
+        "checksum": ""
+    },
+    "transactions": [{
+            "to": "0x6941344942418FE8B58C98d24C8212DebE599935",
+            "value": "0",
+            "data": "0xcf456ae70000000000000000000000009776b3a8e233e1bc1ad24985baecfddd57d47c560000000000000000000000000000000000000000000000000000000000000001",
+            "contractMethod": "setMinter(address,bool)",
+            "contractInputsValues": [
+                "0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56",
+                "false"
+            ]
+        },
+        {
+            "to": "0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56",
+            "value": "0",
+            "data": "0xc6ab5cdc",
+            "contractMethod": "closeBuy()",
+            "contractInputsValues": []
+        },
+        {
+            "to": "0x9776b3A8E233e1Bc1ad24985BaEcFDDd57D47c56",
+            "value": "0",
+            "data": "0xba83c970",
+            "contractMethod": "closeSell()",
+            "contractInputsValues": []
+        },
+        {
+            "to": "0x9858b8FeE34F27959e3CDFAf022a5D0844eaeA65",
+            "value": "0",
+            "data": "0x6c67e8075041594d454e545f5055534845520000000000000000000000000000000000000000000000000000000000009298fd550e2c02adebf781e08214e4131cdec44e",
+            "contractMethod": "grantModuleRole(bytes32,address)",
+            "contractInputsValues": [
+                "0x5041594d454e545f505553484552000000000000000000000000000000000000",
+                "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e"
+            ]
+        },
+        {
+            "to": "0x9858b8FeE34F27959e3CDFAf022a5D0844eaeA65",
+            "value": "0",
+            "data": "0x8028b82f0000000000000000000000009298fd550e2c02adebf781e08214e4131cdec44e0000000000000000000000000d500b1d8e8ef31e21c99d1db9a6444d3adf12700000000000000000000000000000000000000000000025a865e992ce9a77daf6000000000000000000000000000000000000000000000000000000000000000a0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a",
+            "contractMethod": "pushPayment(address,address,uint256,uint256,uint256,uint256)",
+            "contractInputsValues": [
+                "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e",
+                "0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270",
+                "177833956432643534346998",
+                "10",
+                "0",
+                "10"
+            ]
+        },
+        {
+            "to": "0xDE1811172756feb79a4c937246B320d36615C184",
+            "value": "0",
+            "data": "0x77329f350000000000000000000000009858b8fee34f27959e3cdfaf022a5d0844eaea65",
+            "contractMethod": "claimAll(address)",
+            "contractInputsValues": [
+                "0x9858b8FeE34F27959e3CDFAf022a5D0844eaeA65"
+            ]
+        }
+    ]
+}
