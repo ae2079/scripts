@@ -8,16 +8,16 @@ const CONFIG = {
     // Can be a single file or an array of files
     transactionFileNames: [
         "5.json",
-        "1.json",
-        "2.json",
-        "3.json",
-        "4.json",
+        // "1.json",
+        // "2.json",
+        // "3.json",
+        // "4.json",
     ],
     claimsReportFileName: "claims_report.json",
     onlyUsersWithClaims: false, // Set to true to only process users who have claimed
 
     // New stream configuration
-    newStreamStartTimestamp: 1762736400, // Set to 0 to use current time, or specify Unix timestamp
+    newStreamStartTimestamp: 1762718000, // Set to 0 to use current time, or specify Unix timestamp
     // When 0: Uses Math.floor(Date.now() / 1000)
     // Example: 1760371200 for Oct 13, 2025 16:00:00 GMT
 };

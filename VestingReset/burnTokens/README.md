@@ -255,6 +255,94 @@ const testUsers = totalUsers.slice(0, 10); // Test with first 10 users
 const activeUsers = await filterActiveUsers(testUsers, paymentRouterAddress, paymentProcessor);
 ```
 
+## 🔍 Find Biggest Stream ID
+
+A utility script to find the maximum stream ID across all users in the project.
+
+### Usage
+
+```bash
+npm run find-max-stream
+```
+
+or
+
+```bash
+node findBiggestStreamId.js
+```
+
+### What It Does
+
+1. ✅ Reads all transaction files (1-5.json)
+2. ✅ Extracts all unique user addresses
+3. ✅ Fetches stream data for each user from the blockchain
+4. ✅ Identifies the biggest stream ID
+5. ✅ Shows statistics and top 10 biggest stream IDs
+
+### Example Output
+
+```
+═══════════════════════════════════════════════════════
+🔍 Find Biggest Stream ID
+═══════════════════════════════════════════════════════
+
+📖 Reading transaction files...
+
+✅ Successfully read: 1.json
+✅ Successfully read: 2.json
+...
+
+📊 User Statistics:
+   Total unique users: 504
+
+📍 Contract Addresses:
+   Payment Router (Client): 0x6B5d37c206D56B16F44b0C1b89002fd9B138e9Be
+   Payment Processor: 0xD6F574062E948d6B7F07c693f1b4240aFeA41657
+
+🔗 Connecting to blockchain...
+   ✅ Connected successfully
+
+🔍 Fetching stream IDs for 504 users...
+
+   [10/504] Processing...
+   [20/504] Processing...
+   ...
+
+═══════════════════════════════════════════════════════
+📊 RESULTS
+═══════════════════════════════════════════════════════
+
+✅ Total users checked: 504
+✅ Active users (with streams): 350
+✅ Inactive users (no streams): 154
+✅ Total stream IDs found: 892
+
+🎯 BIGGEST STREAM ID:
+   Stream ID: 1523
+   User Address: 0x...
+
+📈 Stream ID Statistics:
+   Unique stream IDs: 456
+   Total stream instances: 892
+
+🔝 Top 10 Biggest Stream IDs:
+   1. 1523
+   2. 1522
+   3. 1521
+   ...
+
+═══════════════════════════════════════════════════════
+✅ Done!
+═══════════════════════════════════════════════════════
+```
+
+### Use Cases
+
+- **Before creating new streams**: Know what the next stream ID will be
+- **Debugging**: Verify stream ID ranges and distribution
+- **Analysis**: Understand how many streams exist in the system
+- **Validation**: Ensure stream IDs are within expected ranges
+
 ## 📋 Next Steps
 
 After generating removal transactions:
@@ -273,6 +361,7 @@ Then:
 
 ## 🔗 Related Scripts
 
+- **`findBiggestStreamId.js`** - Find the biggest stream ID across all users (in this folder)
 - **`../saveStreamDetails/checkActiveStreams.js`** - Quick check if addresses have active streams
 - **`../saveStreamDetails/fetchUserStreamData.js`** - Fetch full stream details
 - **`../PushPaymentFromStreams/generatePushPaymentFromStreams.js`** - Generate new vestings

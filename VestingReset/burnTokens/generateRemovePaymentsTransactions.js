@@ -331,7 +331,7 @@ function generateTransactionJson(safe, projectName, paymentProcessor, client, us
 // Main execution
 async function main() {
     try {
-        const reportFile = '1.json'; // Primary report file to extract project config from
+        const reportFile = '5.json'; // Primary report file to extract project config from
 
         console.log('📖 Reading project configuration from report file...\n');
         const projectConfig = readProjectConfigFromReport(reportFile);
@@ -343,32 +343,32 @@ async function main() {
 
         console.log('\n📖 Reading transaction files...\n');
 
-        const filesData = readTransactionFile("1.json");
-        const totalUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
+        // const filesData = readTransactionFile("5.json");
+        // const totalUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
 
-        // const filesData = readTransactionFile("4.json");
-        // const qaccUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
+        const filesData = readTransactionFile("4.json");
+        const qaccUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
 
-        // const filesDataEA1 = readTransactionFile("1.json");
-        // const ea1Users = getUserAddressesFromTransactions(filesDataEA1.transactions.readable);
+        const filesDataEA1 = readTransactionFile("1.json");
+        const ea1Users = getUserAddressesFromTransactions(filesDataEA1.transactions.readable);
 
-        // const filesDataEA2 = readTransactionFile("2.json");
-        // const ea2Users = getUserAddressesFromTransactions(filesDataEA2.transactions.readable);
+        const filesDataEA2 = readTransactionFile("2.json");
+        const ea2Users = getUserAddressesFromTransactions(filesDataEA2.transactions.readable);
 
-        // const filesDataEA3 = readTransactionFile("3.json");
-        // const ea3Users = getUserAddressesFromTransactions(filesDataEA3.transactions.readable);
+        const filesDataEA3 = readTransactionFile("3.json");
+        const ea3Users = getUserAddressesFromTransactions(filesDataEA3.transactions.readable);
 
-        // const filesDataS2 = readTransactionFile("5.json");
-        // const S2Users = getUserAddressesFromTransactions(filesDataS2.transactions.readable);
+        const filesDataS2 = readTransactionFile("5.json");
+        const S2Users = getUserAddressesFromTransactions(filesDataS2.transactions.readable);
 
         // Union all EA users and remove duplicates
-        // const allEAUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users])];
-        // const totalUsers = [...new Set([...allEAUsers, ...qaccUsers, ...S2Users])];
+        const allEAUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users])];
+        const totalUsers = [...new Set([...allEAUsers, ...qaccUsers, ...S2Users])];
 
         console.log(`\n📊 User Statistics:`);
-        // console.log(`   Total EA users: ${allEAUsers.length}`);
-        // console.log(`   QACC S1 users: ${qaccUsers.length}`);
-        // console.log(`   S2 users: ${S2Users.length}`);
+        console.log(`   Total EA users: ${allEAUsers.length}`);
+        console.log(`   QACC S1 users: ${qaccUsers.length}`);
+        console.log(`   S2 users: ${S2Users.length}`);
         console.log(`   Total users: ${totalUsers.length}`);
 
         const manualUsers = [

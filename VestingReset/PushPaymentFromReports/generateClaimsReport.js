@@ -9,7 +9,7 @@ dotenv.config();
 // CONFIGURATION
 // ============================================================================
 const CONFIG = {
-    paymentRouterAddress: "0x2559C4e77131313BBBeCfA99AF51cDb4B7e9cb8A", // Payment Router address
+    paymentRouterAddress: "0x1A1bD3E1225A9cda8ceD804cc73fC0B0116be0Ce", // Payment Processor address
     polygonScanApiKey: process.env.POLYGONSCAN_API_KEY || "YourApiKeyToken",
     apiUrl: "https://api.etherscan.io/v2/api", // V2 API endpoint
     chainId: "137", // Polygon chain ID

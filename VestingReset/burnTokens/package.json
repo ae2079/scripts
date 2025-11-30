@@ -5,7 +5,8 @@
     "type": "module",
     "main": "generateRemovePaymentsTransactions.js",
     "scripts": {
-        "generate": "node generateRemovePaymentsTransactions.js"
+        "generate": "node generateRemovePaymentsTransactions.js",
+        "find-max-stream": "node findBiggestStreamId.js"
     },
     "dependencies": {
         "dotenv": "^17.2.3",
