@@ -142,6 +142,19 @@ function readTransactionFile(filename) {
     }
 }
 
+function readTransactionFileIfExists(filename) {
+    try {
+        if (!fs.existsSync(filename)) {
+            console.log(`⚠️  File ${filename} does not exist, skipping...`);
+            return null;
+        }
+        return readTransactionFile(filename);
+    } catch (error) {
+        console.error(`❌ Error reading file ${filename}:`, error.message);
+        return null;
+    }
+}
+
 function readProjectConfigFromReport(reportFile) {
     try {
         const data = fs.readFileSync(reportFile, 'utf8');
@@ -331,45 +344,60 @@ function generateTransactionJson(safe, projectName, paymentProcessor, client, us
 // Main execution
 async function main() {
     try {
-        const reportFile = '5.json'; // Primary report file to extract project config from
+        console.log('📖 Reading transaction files dynamically...\n');
 
-        console.log('📖 Reading project configuration from report file...\n');
-        const projectConfig = readProjectConfigFromReport(reportFile);
+        // Define possible transaction files to read
+        const transactionFiles = [
+            { filename: "1.json", label: "File 1" },
+            { filename: "2.json", label: "File 2" },
+            { filename: "3.json", label: "File 3" },
+            { filename: "4.json", label: "File 4" },
+            { filename: "5.json", label: "File 5" },
+        ];
+
+        const filesData = [];
+        const allUsersFromFiles = [];
+        let lastValidFile = null;
+        let lastValidFileName = null;
+
+        // Read all available transaction files
+        for (const fileConfig of transactionFiles) {
+            const data = readTransactionFileIfExists(fileConfig.filename);
+            if (data) {
+                filesData.push({...fileConfig, data });
+                lastValidFile = data;
+                lastValidFileName = fileConfig.filename;
+
+                // Extract users from this file
+                const users = getUserAddressesFromTransactions(data.transactions.readable);
+                allUsersFromFiles.push(...users);
+                console.log(`   - ${fileConfig.label} (${fileConfig.filename}): ${users.length} users`);
+            }
+        }
+
+        if (filesData.length === 0) {
+            throw new Error('No transaction files found! Please ensure at least one transaction file exists.');
+        }
+
+        if (!lastValidFile) {
+            throw new Error('No valid transaction file found to extract metadata from!');
+        }
+
+        // Extract project configuration from the last available transaction file
+        console.log(`\n📖 Reading project configuration from last available file (${lastValidFileName})...\n`);
+        const projectConfig = readProjectConfigFromReport(lastValidFileName);
 
         const projectName = projectConfig.projectName;
         const paymentProcessor = projectConfig.paymentProcessor;
         const paymentRouterAddress = projectConfig.paymentRouter;
         const workflowAdminMultisig = "0x9298fD550E2c02AdeBf781e08214E4131CDeC44e";
 
-        console.log('\n📖 Reading transaction files...\n');
-
-        // const filesData = readTransactionFile("5.json");
-        // const totalUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
-
-        const filesData = readTransactionFile("4.json");
-        const qaccUsers = getUserAddressesFromTransactions(filesData.transactions.readable);
-
-        const filesDataEA1 = readTransactionFile("1.json");
-        const ea1Users = getUserAddressesFromTransactions(filesDataEA1.transactions.readable);
-
-        const filesDataEA2 = readTransactionFile("2.json");
-        const ea2Users = getUserAddressesFromTransactions(filesDataEA2.transactions.readable);
-
-        const filesDataEA3 = readTransactionFile("3.json");
-        const ea3Users = getUserAddressesFromTransactions(filesDataEA3.transactions.readable);
-
-        const filesDataS2 = readTransactionFile("5.json");
-        const S2Users = getUserAddressesFromTransactions(filesDataS2.transactions.readable);
-
-        // Union all EA users and remove duplicates
-        const allEAUsers = [...new Set([...ea1Users, ...ea2Users, ...ea3Users])];
-        const totalUsers = [...new Set([...allEAUsers, ...qaccUsers, ...S2Users])];
+        // Get all unique users
+        const totalUsers = [...new Set(allUsersFromFiles)];
 
         console.log(`\n📊 User Statistics:`);
-        console.log(`   Total EA users: ${allEAUsers.length}`);
-        console.log(`   QACC S1 users: ${qaccUsers.length}`);
-        console.log(`   S2 users: ${S2Users.length}`);
-        console.log(`   Total users: ${totalUsers.length}`);
+        console.log(`   - Total files read: ${filesData.length}`);
+        console.log(`   - Total unique users found: ${totalUsers.length}`);
 
         const manualUsers = [
             "0xA82BcD1BA56b4BB0f46Bc29dA53413c73Be27509",
