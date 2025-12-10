@@ -63,7 +63,7 @@ async function fetchPaymentProcessorTransactions(paymentRouterAddress, startBloc
     const url = new URL(CONFIG.apiUrl);
     url.searchParams.append('chainid', CONFIG.chainId); // Polygon chain ID
     url.searchParams.append('module', 'account');
-    url.searchParams.append('action', 'txlist');
+    url.searchParams.append('action', 'tokentx'); // Get token transfers instead of regular transactions
     url.searchParams.append('address', paymentRouterAddress);
     url.searchParams.append('startblock', startBlock);
     url.searchParams.append('endblock', 'latest');

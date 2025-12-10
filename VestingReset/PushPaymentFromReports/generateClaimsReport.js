@@ -9,7 +9,7 @@ dotenv.config();
 // CONFIGURATION
 // ============================================================================
 const CONFIG = {
-    paymentRouterAddress: "0x1A1bD3E1225A9cda8ceD804cc73fC0B0116be0Ce", // Payment Processor address
+    paymentRouterAddress: "", // Payment Processor address
     polygonScanApiKey: process.env.POLYGONSCAN_API_KEY || "YourApiKeyToken",
     apiUrl: "https://api.etherscan.io/v2/api", // V2 API endpoint
     chainId: "137", // Polygon chain ID
@@ -17,9 +17,6 @@ const CONFIG = {
     outputFileName: "claims_report.json",
     startBlock: 0 // Set to 0 to get all transactions
 };
-
-// ERC20 Transfer event signature
-const TRANSFER_EVENT_SIGNATURE = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
 
 /**
  * Sleep utility
@@ -35,7 +32,7 @@ async function fetchPaymentProcessorTransactions(paymentRouterAddress, startBloc
     const url = new URL(CONFIG.apiUrl);
     url.searchParams.append('chainid', CONFIG.chainId); // Polygon chain ID
     url.searchParams.append('module', 'account');
-    url.searchParams.append('action', 'txlist');
+    url.searchParams.append('action', 'tokentx'); // Get token transfers instead of regular transactions
     url.searchParams.append('address', paymentRouterAddress);
     url.searchParams.append('startblock', startBlock);
     url.searchParams.append('endblock', 'latest');
@@ -62,32 +59,6 @@ async function fetchPaymentProcessorTransactions(paymentRouterAddress, startBloc
 }
 
 /**
- * Fetch transaction receipt/logs for a specific transaction
- */
-async function fetchTransactionLogs(txHash) {
-    const url = new URL(CONFIG.apiUrl);
-    url.searchParams.append('chainid', CONFIG.chainId); // Polygon chain ID
-    url.searchParams.append('module', 'proxy');
-    url.searchParams.append('action', 'eth_getTransactionReceipt');
-    url.searchParams.append('txhash', txHash);
-    url.searchParams.append('apikey', CONFIG.polygonScanApiKey);
-
-    try {
-        const response = await fetch(url.toString());
-        const data = await response.json();
-
-        if (data.error) {
-            throw new Error(`API error: ${data.error.message || data.error}`);
-        }
-
-        return data.result || null;
-    } catch (error) {
-        console.error('❌ Error fetching transaction logs:', error.message);
-        throw error;
-    }
-}
-
-/**
  * Generate claims report
  */
 async function generateClaimsReport() {
@@ -100,109 +71,94 @@ async function generateClaimsReport() {
 
     // Validate API key
     if (!CONFIG.polygonScanApiKey || CONFIG.polygonScanApiKey === "YourApiKeyToken") {
-        console.error('❌ Error: POLYGONSCAN_API_KEY not set in .env file');
-        console.error('Please create a .env file with: POLYGONSCAN_API_KEY=your_actual_key');
-        process.exit(1);
+        console.log('⚠️  WARNING: POLYGONSCAN_API_KEY not set in .env file');
+        console.log('   Get your free API key at: https://polygonscan.com/apis');
+        console.log('   Set it in .env file: POLYGONSCAN_API_KEY=your_actual_key\n');
     }
 
-    console.log('📊 Step 1: Fetching all Payment Router transactions...\n');
+    console.log('📊 Step 1: Fetching all token transfers from Payment Router...\n');
 
-    const allTransactions = await fetchPaymentProcessorTransactions(
+    const allTransfers = await fetchPaymentProcessorTransactions(
         CONFIG.paymentRouterAddress,
         CONFIG.startBlock
     );
 
-    console.log(`   ✓ Found ${allTransactions.length} total transactions\n`);
+    console.log(`   ✓ Found ${allTransfers.length} total token transfers\n`);
 
-    const successfulTxs = allTransactions.filter(tx => tx.isError === '0');
-    console.log(`   ✓ Found ${successfulTxs.length} successful transactions\n`);
+    // Filter for transfers FROM the payment router (these are claims)
+    const claimTransfers = allTransfers.filter(tx =>
+        tx.from && tx.from.toLowerCase() === CONFIG.paymentRouterAddress.toLowerCase()
+    );
+    console.log(`   ✓ Found ${claimTransfers.length} claim transfers (sent from Payment Router)\n`);
 
-    if (successfulTxs.length === 0) {
-        console.log('⚠️  No successful transactions found');
+    if (claimTransfers.length === 0) {
+        console.log('⚠️  No claim transfers found');
         return;
     }
 
-    console.log('🔎 Step 2: Analyzing transaction logs for token claims...\n');
+    console.log('🔎 Step 2: Processing token claims...\n');
 
     // Store claims data
     // Structure: { userAddress: { tokenAddress: { totalClaimed, claims: [...] } } }
     const claimsByUser = new Map();
     let processedCount = 0;
-    let claimsFoundCount = 0;
 
-    for (const tx of successfulTxs) {
+    for (const transfer of claimTransfers) {
         processedCount++;
 
         if (processedCount % 10 === 0) {
-            console.log(`   Progress: ${processedCount}/${successfulTxs.length} transactions analyzed...`);
+            console.log(`   Progress: ${processedCount}/${claimTransfers.length} transfers processed...`);
         }
 
         try {
-            // Rate limiting
-            await sleep(CONFIG.requestDelay);
+            const tokenAddress = transfer.contractAddress;
+            const recipient = transfer.to.toLowerCase();
+            const value = BigInt(transfer.value);
 
-            const receipt = await fetchTransactionLogs(tx.hash);
-
-            if (!receipt || !receipt.logs) {
-                continue;
-            }
-
-            // Look for Transfer events
-            for (const log of receipt.logs) {
-                // Check if this is a Transfer event
-                if (log.topics[0] === TRANSFER_EVENT_SIGNATURE && log.topics.length >= 3) {
-                    const tokenAddress = log.address;
-                    const from = '0x' + log.topics[1].slice(26); // Remove padding
-                    const to = '0x' + log.topics[2].slice(26); // Remove padding
-                    const value = BigInt(log.data);
-
-                    // Check if this is a transfer TO the transaction sender (a claim)
-                    if (to.toLowerCase() === tx.from.toLowerCase() && value > BigInt(0)) {
-                        claimsFoundCount++;
-
-                        // Initialize user data if needed
-                        if (!claimsByUser.has(to.toLowerCase())) {
-                            claimsByUser.set(to.toLowerCase(), new Map());
-                        }
-
-                        const userTokens = claimsByUser.get(to.toLowerCase());
-
-                        // Initialize token data if needed
-                        if (!userTokens.has(tokenAddress.toLowerCase())) {
-                            userTokens.set(tokenAddress.toLowerCase(), {
-                                tokenAddress: tokenAddress,
-                                totalClaimed: BigInt(0),
-                                totalClaimedFormatted: "0",
-                                claimCount: 0,
-                                claims: []
-                            });
-                        }
-
-                        const tokenData = userTokens.get(tokenAddress.toLowerCase());
-
-                        // Add claim
-                        tokenData.totalClaimed += value;
-                        tokenData.claimCount++;
-                        tokenData.claims.push({
-                            transactionHash: tx.hash,
-                            blockNumber: tx.blockNumber,
-                            timestamp: tx.timeStamp,
-                            date: new Date(Number(tx.timeStamp) * 1000).toISOString(),
-                            amount: value.toString(),
-                            amountFormatted: ethers.formatEther(value),
-                            from: from
-                        });
-                    }
+            if (value > BigInt(0)) {
+                // Initialize user data if needed
+                if (!claimsByUser.has(recipient)) {
+                    claimsByUser.set(recipient, new Map());
                 }
+
+                const userTokens = claimsByUser.get(recipient);
+
+                // Initialize token data if needed
+                if (!userTokens.has(tokenAddress.toLowerCase())) {
+                    userTokens.set(tokenAddress.toLowerCase(), {
+                        tokenAddress: tokenAddress,
+                        tokenName: transfer.tokenName || 'Unknown',
+                        tokenSymbol: transfer.tokenSymbol || 'Unknown',
+                        totalClaimed: BigInt(0),
+                        totalClaimedFormatted: "0",
+                        claimCount: 0,
+                        claims: []
+                    });
+                }
+
+                const tokenData = userTokens.get(tokenAddress.toLowerCase());
+
+                // Add claim
+                tokenData.totalClaimed += value;
+                tokenData.claimCount++;
+                tokenData.claims.push({
+                    transactionHash: transfer.hash,
+                    blockNumber: transfer.blockNumber,
+                    timestamp: transfer.timeStamp,
+                    date: new Date(Number(transfer.timeStamp) * 1000).toISOString(),
+                    amount: value.toString(),
+                    amountFormatted: ethers.formatEther(value),
+                    from: transfer.from
+                });
             }
 
         } catch (error) {
-            console.error(`   ⚠️  Error processing tx ${tx.hash}: ${error.message}`);
+            console.error(`   ⚠️  Error processing transfer ${transfer.hash}: ${error.message}`);
         }
     }
 
-    console.log(`\n   ✓ Completed! Analyzed ${processedCount} transactions`);
-    console.log(`   ✓ Found ${claimsFoundCount} token claims\n`);
+    console.log(`\n   ✓ Completed! Processed ${processedCount} transfers`);
+    console.log(`   ✓ Found ${claimsByUser.size} users with claims\n`);
 
     // Step 3: Format output
     console.log('📝 Step 3: Formatting report...\n');
@@ -212,9 +168,8 @@ async function generateClaimsReport() {
         paymentRouterAddress: CONFIG.paymentRouterAddress,
         chainId: CONFIG.chainId,
         chainName: "Polygon",
-        totalTransactions: allTransactions.length,
-        successfulTransactions: successfulTxs.length,
-        totalClaims: claimsFoundCount,
+        totalTransfers: allTransfers.length,
+        claimTransfers: claimTransfers.length,
         totalUsers: claimsByUser.size,
         users: []
     };
@@ -258,9 +213,9 @@ async function generateClaimsReport() {
     console.log('='.repeat(80));
     console.log('📊 SUMMARY');
     console.log('='.repeat(80));
-    console.log(`Total Users: ${report.totalUsers}`);
-    console.log(`Total Claims: ${report.totalClaims}`);
-    console.log(`Total Transactions Analyzed: ${report.totalTransactions}\n`);
+    console.log(`Total Token Transfers: ${report.totalTransfers}`);
+    console.log(`Claim Transfers (from Payment Router): ${report.claimTransfers}`);
+    console.log(`Total Users with Claims: ${report.totalUsers}\n`);
 
     // Show top 10 claimers
     const sortedByClaimCount = [...report.users].sort((a, b) =>

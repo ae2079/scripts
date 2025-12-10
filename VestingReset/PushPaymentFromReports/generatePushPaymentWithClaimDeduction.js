@@ -17,7 +17,7 @@ const CONFIG = {
     onlyUsersWithClaims: false, // Set to true to only process users who have claimed
 
     // New stream configuration
-    newStreamStartTimestamp: 1762718000, // Set to 0 to use current time, or specify Unix timestamp
+    newStreamStartTimestamp: 0, // Set to 0 to use current time, or specify Unix timestamp like this: 1765382400 for Nov 9, 2025 16:00:00 GMT
     // When 0: Uses Math.floor(Date.now() / 1000)
     // Example: 1760371200 for Oct 13, 2025 16:00:00 GMT
 };
